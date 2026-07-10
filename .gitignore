@@ -1,0 +1,25 @@
+# Source corpus (large, publicly downloadable — document the download step instead of committing it)
+*.pdf
+
+# Ingestion artifacts (regenerable)
+data/
+*.index
+*.lance/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Secrets
+.env
+.env.local
+
+# Local machine settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
