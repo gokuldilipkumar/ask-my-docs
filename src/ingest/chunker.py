@@ -92,8 +92,24 @@ def apply_sliding_window(
     return windows
 
 
-def chunk_pdf(pdf_path: Path, min_tokens: int, max_tokens: int, overlap_pct: float) -> list[Chunk]:
+def chunk_pdf(
+    pdf_path: Path,
+    min_tokens: int,
+    max_tokens: int,
+    overlap_pct: float,
+    body_page_start: int = 0,
+    body_page_end: int | None = None,
+) -> list[Chunk]:
     spans = extract_page_spans(pdf_path)
+    # Drop front/back matter before header detection: TOC pages repeat chapter-header
+    # lines verbatim (duplicating every detected chapter) and index/glossary headings
+    # otherwise fragment into hundreds of junk sections.
+    spans = [
+        s
+        for s in spans
+        if s.page_index >= body_page_start
+        and (body_page_end is None or s.page_index <= body_page_end)
+    ]
     chapters = detect_chapter_headers(spans)
     subsections = detect_subsection_headers(spans)
     sections = group_into_sections(spans, chapters, subsections)

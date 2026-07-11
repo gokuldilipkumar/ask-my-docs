@@ -2,6 +2,10 @@ chunking:
   min_tokens: 400
   max_tokens: 600
   overlap_pct: 0.15
+  # FAA-H-8083-3C: chapter 1 starts at page index 21; glossary ends at 390
+  # (kept - real definitional content); index 391-405 and front matter 0-20 dropped
+  body_page_start: 21
+  body_page_end: 390
 
 retrieval:
   rrf_k: 60

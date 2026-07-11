@@ -13,6 +13,10 @@ class ChunkingConfig(BaseModel):
     min_tokens: int = 400
     max_tokens: int = 600
     overlap_pct: float = 0.15
+    # 0-based inclusive page-index range of retrievable content; pages outside it
+    # (cover/TOC front matter, back-of-book index) are excluded before chunking
+    body_page_start: int = 0
+    body_page_end: int | None = None
 
 
 class RetrievalConfig(BaseModel):

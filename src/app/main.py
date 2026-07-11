@@ -23,6 +23,8 @@ def ingest(pdf: Path = typer.Option(...), out: Path = typer.Option(...)) -> None
         min_tokens=settings.chunking.min_tokens,
         max_tokens=settings.chunking.max_tokens,
         overlap_pct=settings.chunking.overlap_pct,
+        body_page_start=settings.chunking.body_page_start,
+        body_page_end=settings.chunking.body_page_end,
     )
     build_bm25_index(chunks, out / "bm25")
     build_vector_index(chunks, out / "lancedb")

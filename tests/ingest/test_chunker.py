@@ -81,6 +81,38 @@ def test_trailing_short_window_is_merged_into_previous_window():
     assert windows[0] == text
 
 
+def test_body_page_range_filters_front_and_back_matter(make_pdf):
+    pdf_path = make_pdf([
+        [   # front matter: TOC page repeating the chapter-header line verbatim
+            ("Chapter 4: Energy Management", 14, True),
+            ("Total Energy 4-1", 10, False),
+        ],
+        [   # body
+            ("Chapter 4: Energy Management", 14, True),
+            ("Total Energy", 10, True),
+            ("Body text about total energy.", 10, False),
+        ],
+        [   # back matter: index page
+            ("Index", 14, True),
+            ("stall 4-2, 4-3, 5-1", 10, False),
+        ],
+    ])
+
+    chunks = chunk_pdf(
+        pdf_path,
+        min_tokens=400,
+        max_tokens=600,
+        overlap_pct=0.15,
+        body_page_start=1,
+        body_page_end=1,
+    )
+
+    assert [c.section_title for c in chunks] == ["Total Energy"]
+    assert chunks[0].chapter_number == 4
+    assert "Body text about total energy." in chunks[0].text
+    assert "stall 4-2" not in chunks[0].text
+
+
 def test_chunk_pdf_end_to_end_produces_stable_ids(make_pdf):
     pdf_path = make_pdf([
         [
