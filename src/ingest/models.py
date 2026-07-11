@@ -13,3 +13,10 @@ class ChapterHeader(BaseModel):
     chapter_number: int
     title: str
     page_index: int
+
+
+class SubsectionHeader(BaseModel):
+    title: str
+    page_index: int
+    font_size: float
+    is_bold: bool
