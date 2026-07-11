@@ -7,3 +7,9 @@ class TextSpan(BaseModel):
     is_bold: bool
     page_index: int
     bbox: tuple[float, float, float, float]
+
+
+class ChapterHeader(BaseModel):
+    chapter_number: int
+    title: str
+    page_index: int
