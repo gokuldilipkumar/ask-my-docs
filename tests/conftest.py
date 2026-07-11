@@ -3,6 +3,26 @@ from pathlib import Path
 import fitz
 import pytest
 
+from ingest.models import Chunk
+
+
+@pytest.fixture
+def make_chunk():
+    def _make_chunk(chunk_id: str, text: str) -> Chunk:
+        return Chunk(
+            chunk_id=chunk_id,
+            chapter_number=4,
+            chapter_title="Energy Management",
+            section_title="Total Energy",
+            page_index_start=0,
+            page_index_end=0,
+            text=text,
+            token_count=len(text.split()),
+            sequence=0,
+        )
+
+    return _make_chunk
+
 
 @pytest.fixture
 def make_pdf(tmp_path):

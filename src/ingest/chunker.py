@@ -122,6 +122,8 @@ def chunk_pdf(pdf_path: Path, min_tokens: int, max_tokens: int, overlap_pct: flo
                     page_index_start=section.page_index_start,
                     page_index_end=section.page_index_end,
                     text=window_text,
+                    # attach figure refs once per section, not per window, so
+                    # overlapping windows don't each re-list the same figures
                     figure_refs=section_figure_refs if sequence == 0 else [],
                     token_count=count_tokens(window_text),
                     sequence=sequence,
