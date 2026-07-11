@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from ingest.headers import CHAPTER_PATTERN, FIGURE_CAPTION_PATTERN
 from ingest.models import ChapterHeader, SubsectionHeader, TextSpan
+from ingest.tokens import count_tokens
 
 
 @dataclass
@@ -50,3 +51,26 @@ def group_into_sections(
             current.page_index_end = span.page_index
 
     return sections
+
+
+def apply_sliding_window(
+    section: RawSection, min_tokens: int, max_tokens: int, overlap_pct: float
+) -> list[str]:
+    if count_tokens(section.text) <= max_tokens:
+        return [section.text]
+
+    words = section.text.split()
+    target_words = max_tokens  # word count is an upper-bound proxy; count_tokens gates the real limit
+    overlap_words = int(target_words * overlap_pct)
+    step = target_words - overlap_words
+
+    windows: list[str] = []
+    start = 0
+    while start < len(words):
+        window_words = words[start : start + target_words]
+        window_text = " ".join(window_words)
+        windows.append(window_text)
+        if start + target_words >= len(words):
+            break
+        start += step
+    return windows
