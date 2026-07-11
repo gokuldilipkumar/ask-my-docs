@@ -61,6 +61,26 @@ def test_long_section_is_split_into_overlapping_windows():
     assert any(w in windows[1] for w in tail_words)
 
 
+def test_trailing_short_window_is_merged_into_previous_window():
+    # 650 words leaves a ~140-word remainder after the first 600-word window,
+    # which is well under min_tokens=400 and must not survive as an orphan chunk.
+    words = [f"word{i}" for i in range(650)]
+    text = " ".join(words)
+    section = RawSection(
+        chapter_number=4,
+        chapter_title="Energy Management",
+        section_title="Total Energy",
+        page_index_start=0,
+        page_index_end=5,
+        text=text,
+    )
+
+    windows = apply_sliding_window(section, min_tokens=400, max_tokens=600, overlap_pct=0.15)
+
+    assert len(windows) == 1
+    assert windows[0] == text
+
+
 def test_chunk_pdf_end_to_end_produces_stable_ids(make_pdf):
     pdf_path = make_pdf([
         [

@@ -73,15 +73,22 @@ def apply_sliding_window(
     overlap_words = int(target_words * overlap_pct)
     step = target_words - overlap_words
 
-    windows: list[str] = []
+    starts: list[int] = []
     start = 0
     while start < len(words):
-        window_words = words[start : start + target_words]
-        window_text = " ".join(window_words)
-        windows.append(window_text)
+        starts.append(start)
         if start + target_words >= len(words):
             break
         start += step
+
+    windows = [" ".join(words[s : s + target_words]) for s in starts]
+
+    # A trailing window under min_tokens is an orphan fragment, not a usable chunk -
+    # fold it back into the previous window instead of emitting it standalone.
+    if len(windows) > 1 and count_tokens(windows[-1]) < min_tokens:
+        merged_text = " ".join(words[starts[-2] :])
+        windows = windows[:-2] + [merged_text]
+
     return windows
 
 
