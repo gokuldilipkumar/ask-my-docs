@@ -1,7 +1,16 @@
 from dataclasses import dataclass
+from pathlib import Path
 
-from ingest.headers import CHAPTER_PATTERN, FIGURE_CAPTION_PATTERN
-from ingest.models import ChapterHeader, SubsectionHeader, TextSpan
+from ingest.chunk_id import make_chunk_id
+from ingest.figures import extract_figure_ref
+from ingest.headers import (
+    CHAPTER_PATTERN,
+    FIGURE_CAPTION_PATTERN,
+    detect_chapter_headers,
+    detect_subsection_headers,
+)
+from ingest.models import Chunk, ChapterHeader, SubsectionHeader, TextSpan
+from ingest.pdf_loader import extract_page_spans
 from ingest.tokens import count_tokens
 
 
@@ -74,3 +83,41 @@ def apply_sliding_window(
             break
         start += step
     return windows
+
+
+def chunk_pdf(pdf_path: Path, min_tokens: int, max_tokens: int, overlap_pct: float) -> list[Chunk]:
+    spans = extract_page_spans(pdf_path)
+    chapters = detect_chapter_headers(spans)
+    subsections = detect_subsection_headers(spans)
+    sections = group_into_sections(spans, chapters, subsections)
+
+    figure_refs_by_page: dict[int, list] = {}
+    for span in spans:
+        ref = extract_figure_ref(span.text)
+        if ref:
+            figure_refs_by_page.setdefault(span.page_index, []).append(ref)
+
+    chunks: list[Chunk] = []
+    for section in sections:
+        windows = apply_sliding_window(section, min_tokens, max_tokens, overlap_pct)
+        section_figure_refs = [
+            ref
+            for page in range(section.page_index_start, section.page_index_end + 1)
+            for ref in figure_refs_by_page.get(page, [])
+        ]
+        for sequence, window_text in enumerate(windows):
+            chunks.append(
+                Chunk(
+                    chunk_id=make_chunk_id(section.chapter_number, section.section_title, sequence),
+                    chapter_number=section.chapter_number,
+                    chapter_title=section.chapter_title,
+                    section_title=section.section_title,
+                    page_index_start=section.page_index_start,
+                    page_index_end=section.page_index_end,
+                    text=window_text,
+                    figure_refs=section_figure_refs if sequence == 0 else [],
+                    token_count=count_tokens(window_text),
+                    sequence=sequence,
+                )
+            )
+    return chunks
