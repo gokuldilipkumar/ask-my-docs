@@ -19,12 +19,16 @@ Use this workflow to execute a structured implementation plan step-by-step.
    - Read the implementation plan from `docs/plans/`.
    - Ensure you are in the correct context (checkout branch if needed).
 
-2. **Debugging Protocol**
+2. **Third-Party API Verification**
+   - Before writing a RED test against a less-common third-party library API (config loaders, ORMs, CLI frameworks, index/vector-store libraries) — especially one the plan wrote example code for without running it — verify the actual behavior with a 5-line throwaway script first. Plan-time example code is a best guess, not a verified contract.
+   - This session hit three real mismatches this way: `pydantic-settings`' `YamlConfigSettingsSource` doesn't support a per-instance `_yaml_file` init-kwarg override the way `_env_file` does (the plan's test design assumed it did); `typer` silently collapses to single-command mode — no subcommand name required — when only one `@app.command()` is registered, breaking a planned `runner.invoke(app, ["ingest", ...])` test shape until an empty `@app.callback()` forced multi-command mode; `python -m app.main` does not pick up `src/`-layout packages the way pytest's `pythonpath` ini option does — needs `PYTHONPATH` set explicitly for any manual (non-pytest) CLI invocation.
+
+4. **Debugging Protocol**
    - If a task fails more than once (same error or cycling through approaches), **stop and create a debug log** at `docs/debug-log-<topic>.md` with three columns: `Attempt | What was tried | Why it failed`.
    - Read this log before every subsequent attempt. This prevents Claude from re-trying approaches that already failed as context grows, and surfaces the actual constraint faster.
    - Delete the log once the task is resolved.
 
-3. **Task Execution (Round-robin per task)**
+5. **Task Execution (Round-robin per task)**
    - For each task in the plan:
      - **RED**: Write the failing test as specified in the plan. Watch it fail.
      - **GREEN**: Write minimal code to make the test pass.
@@ -36,14 +40,14 @@ Use this workflow to execute a structured implementation plan step-by-step.
      - Apply craft principles from `ui-development` skill
      - Offer to save new patterns after completion
 
-4. **Subagent Handoff (Optional)**
+6. **Subagent Handoff (Optional)**
    - If a task is complex, you may spawn a subagent to handle the RED-GREEN-REFACTOR cycle, but you MUST review its work against the plan's success criteria.
 
-5. **Technical Debt Discovery**
+7. **Technical Debt Discovery**
    - As you implement, actively look for existing technical debt, complex code that needs refactoring, or missing edge case handling.
    - If found, and it's out of scope for the current task, IMMEDIATELY add it to `BUGS.md` or the appropriate technical debt tracker.
 
-6. **Progress Tracking**
+8. **Progress Tracking**
    - Check off tasks in the plan file as they are completed.
    - Update `PROJECT_HISTORY.md` at the end of the session.
 

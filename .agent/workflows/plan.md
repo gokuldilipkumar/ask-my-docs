@@ -49,6 +49,7 @@ Use this workflow once a design has been approved to create a bite-sized, execut
      - [ ] **File Patterns**: How are imports structured? Named exports or defaults? Where do types live?
      - [ ] **Error Handling**: What's the existing `catch` pattern? Toast + console, or something else?
      - [ ] **Reuse Audit**: For every new function the plan calls for, search the codebase first. If an existing function covers ≥80% of the need, the plan task must say "call `X`, don't re-implement." State "No existing equivalent found" explicitly if the search came up empty. Agents will not look for helpers unless told to.
+     - [ ] **Heuristic Extraction Sampling**: For any plan chunk that classifies/extracts from real unstructured source content by heuristic (font metadata, layout position, regex over free text — not a fixed schema), pull 2-3 real representative excerpts from the actual source document before writing synthetic test fixtures for it. A fixture built only from the "obviously correct" textbook case (e.g. a bold line alone on its own line) will miss real edge cases the source document actually contains (e.g. inline bold emphasis sharing a line with body text) — catching this at fixture-design time is far cheaper than catching it after `/build` via a later real-corpus spot-check.
 8. **Plan**: ONLY then, proceed to write the Implementation Plan below, referencing the approved mockup as the "Spec".
 
 ## Plan Structure (MUST include these sections)
