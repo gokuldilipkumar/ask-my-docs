@@ -41,6 +41,8 @@ def detect_subsection_headers(spans: list[TextSpan]) -> list[SubsectionHeader]:
         body_size = Counter(s.font_size for s in candidates).most_common(1)[0][0]
 
         for span in candidates:
+            if span.line_span_count > 1:
+                continue  # shares a line with other text -> inline emphasis, not a heading
             if span.font_size == body_size and not span.is_bold:
                 continue  # body-sized, non-bold text is never a header
             if span.is_bold or span.font_size > body_size * SIZE_RATIO_THRESHOLD:

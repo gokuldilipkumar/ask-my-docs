@@ -14,17 +14,16 @@ def extract_page_spans(pdf_path: Path) -> list[TextSpan]:
         raw = page.get_text("dict")
         for block in raw["blocks"]:
             for line in block.get("lines", []):
-                for span in line["spans"]:
-                    text = span["text"].strip()
-                    if not text:
-                        continue
+                non_empty_spans = [s for s in line["spans"] if s["text"].strip()]
+                for span in non_empty_spans:
                     spans.append(
                         TextSpan(
-                            text=text,
+                            text=span["text"].strip(),
                             font_size=span["size"],
                             is_bold=bool(span["flags"] & BOLD_FLAG),
                             page_index=page_index,
                             bbox=tuple(span["bbox"]),
+                            line_span_count=len(non_empty_spans),
                         )
                     )
     doc.close()

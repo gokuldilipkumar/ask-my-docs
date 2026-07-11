@@ -66,3 +66,20 @@ def test_does_not_flag_plain_body_text_as_header(make_pdf):
     subsections = detect_subsection_headers(spans)
 
     assert subsections == []
+
+
+def test_does_not_flag_inline_bold_emphasis_sharing_a_line_as_header(make_pdf):
+    # Reproduces a real-corpus failure: "Rule #1:" is bolded inline within a
+    # sentence, not a standalone heading on its own line.
+    pdf_path = make_pdf([[
+        ("Chapter 4: Energy Management", 14, True),
+        [("Rule #1:", 10, True), ("If you want to move to a new energy state, then:", 10, False)],
+        ("Body text explaining the rule in more detail.", 10, False),
+        ("Total Energy", 10, True),
+        ("Body text about total energy.", 10, False),
+    ]])
+    spans = extract_page_spans(pdf_path)
+
+    subsections = detect_subsection_headers(spans)
+
+    assert [s.title for s in subsections] == ["Total Energy"]
