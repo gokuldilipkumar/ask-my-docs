@@ -37,11 +37,11 @@ This is why Block 2 has no `retrieval/bm25.py` or `retrieval/vector.py` wrapper 
 ## Block 2: Hybrid Retrieval
 
 ### Success Criteria
-- [ ] `reciprocal_rank_fusion` combines N ranked lists into one fused ranking using per-list weights and a configurable `k` constant.
-- [ ] A document ranked first in every input list ranks first in the fusion.
-- [ ] Zero-weighting one input list makes the fusion match the other list's order exactly (proves weights are load-bearing, not decorative).
-- [ ] `hybrid_retrieve` wires real BM25 + vector search through fusion and truncates to `settings.retrieval.top_n`.
-- [ ] Changing `bm25_weight`/`vector_weight` in `hybrid_retrieve`'s config measurably changes which chunk ranks first — the design doc's "switching fusion weights via config visibly changes retrieval" acceptance criterion, proven end-to-end against real indexes, not just at the pure-fusion level.
+- [x] `reciprocal_rank_fusion` combines N ranked lists into one fused ranking using per-list weights and a configurable `k` constant.
+- [x] A document ranked first in every input list ranks first in the fusion.
+- [x] Zero-weighting one input list makes the fusion match the other list's order exactly (proves weights are load-bearing, not decorative).
+- [x] `hybrid_retrieve` wires real BM25 + vector search through fusion and truncates to `settings.retrieval.top_n`.
+- [x] Changing `bm25_weight`/`vector_weight` in `hybrid_retrieve`'s config measurably changes which chunk ranks first — the design doc's "switching fusion weights via config visibly changes retrieval" acceptance criterion, proven end-to-end against real indexes, not just at the pure-fusion level. *(Built 2026-07-11. Note: the plan's original Chunk 2.2 weight-flip fixture — keyword "balance" — turned out not to discriminate: the vector model also ranked the keyword-stuffed chunk first. Replaced at RED time, per the plan's own Step 4 contingency, with a fixture whose margins were verified against the real model: semantic-stall-description chunk vs off-topic keyword-"stall" chunk. Chunk 2.3 spot-check findings logged to `BUGS.md` and `.agent/decisions.log`.)*
 
 ### Chunk 2.1 — Reciprocal Rank Fusion (pure function)
 
