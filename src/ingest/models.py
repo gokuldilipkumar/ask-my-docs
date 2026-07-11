@@ -20,3 +20,8 @@ class SubsectionHeader(BaseModel):
     page_index: int
     font_size: float
     is_bold: bool
+
+
+class FigureRef(BaseModel):
+    figure_number: str
+    caption: str
