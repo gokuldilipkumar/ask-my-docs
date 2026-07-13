@@ -34,7 +34,7 @@ class RerankConfig(BaseModel):
 
 class GenerationConfig(BaseModel):
     model: str = "claude-sonnet-5"
-    max_tokens: int = 1024
+    max_tokens: int = 2048
     max_retries: int = 3
     timeout_seconds: float = 30.0
 

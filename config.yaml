@@ -20,7 +20,7 @@ rerank:
 
 generation:
   model: claude-sonnet-5
-  max_tokens: 1024
+  max_tokens: 2048
   max_retries: 3
   timeout_seconds: 30.0
 

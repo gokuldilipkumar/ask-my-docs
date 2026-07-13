@@ -62,6 +62,30 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
     assert result is canned
 
 
+def test_generate_answer_raises_clear_error_on_truncated_output():
+    # Reproduces a real 2026-07-13 spot-check crash: a detailed question exceeded
+    # max_tokens=1024, truncating the model's JSON mid-string. client.messages.parse
+    # raised a raw pydantic.ValidationError three SDK frames deep ("EOF while parsing
+    # a string") instead of anything actionable. generate_answer must catch that and
+    # raise a message pointing at the actual cause (max_tokens), not let a bare
+    # pydantic internal error surface to the caller.
+    class FakeMessages:
+        def parse(self, **kwargs):
+            GeneratedAnswer.model_validate_json('{"answer_text": "During u')  # raises
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    config = GenerationConfig(max_tokens=1024)
+
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        generate_answer(FakeClient(), "any question", [("a", "text")], config)
+
+
 @pytest.mark.slow
 @pytest.mark.live_api
 def test_generate_answer_cites_real_chunk_for_in_scope_question():
