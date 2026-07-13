@@ -23,12 +23,12 @@
 
 ## Block 3: Cross-Encoder Reranking
 
-**Success criteria**
-- [ ] `rerank()` reorders a fused candidate list and truncates to `config.top_k` (real-model test + real-corpus spot-check).
-- [ ] Model is swappable via `settings.rerank.model` with zero code changes (verified by a fake-model test asserting the configured name is what gets loaded).
-- [ ] `enabled=False` is a no-op passthrough: preserves fused order, truncates to `top_k`, and **never loads the model** (asserted via monkeypatch).
-- [ ] Contract cases covered: empty candidate list; `top_k` larger than the candidate count.
-- [ ] Real-corpus spot-check: toggling `rerank.enabled` visibly changes the top-5 for at least one of the three sample queries (design-doc acceptance criterion), with per-query rerank latency measured on this CPU (design claim: ~130 ms / 16-candidate batch).
+**Success criteria** (all verified at build time, 2026-07-13)
+- [x] `rerank()` reorders a fused candidate list and truncates to `config.top_k` (real-model test + real-corpus spot-check).
+- [x] Model is swappable via `settings.rerank.model` with zero code changes (verified by a fake-model test asserting the configured name is what gets loaded).
+- [x] `enabled=False` is a no-op passthrough: preserves fused order, truncates to `top_k`, and **never loads the model** (asserted via monkeypatch).
+- [x] Contract cases covered: empty candidate list; `top_k` larger than the candidate count; plus (unplanned, found by spot-check) duplicate chunk_ids in the LanceDB table.
+- [x] Real-corpus spot-check: toggling `rerank.enabled` changed the top-5 on **all three** sample queries (criterion required ≥1); reranked order is subjectively same-or-better (keyword-soup hydroplaning chunk demoted off the VMC/VSO top-5, relevant chunks promoted from fused #14/#17). Latency measured: **~5.3s per 20 real-length candidates** — the ~130ms design claim only holds for short passages; logged to `BUGS.md` as a Block 4 decision item, alongside the newly found duplicate-chunk_id ingestion bug (617 rows / 590 unique ids).
 
 ---
 
