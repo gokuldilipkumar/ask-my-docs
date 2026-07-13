@@ -42,3 +42,22 @@ def test_get_chunk_texts_raises_on_unknown_id(make_chunk, tmp_path):
 
     with pytest.raises(KeyError):
         get_chunk_texts(db_path, ["a", "missing-id"])
+
+
+@pytest.mark.slow
+def test_get_chunk_texts_tolerates_duplicate_chunk_ids_in_table(make_chunk, tmp_path):
+    # The real corpus currently contains duplicate chunk_ids (repeated section
+    # titles collide in make_chunk_id — tracked in BUGS.md). A scan limit sized
+    # to len(chunk_ids) silently truncates when duplicates inflate the match
+    # count, hiding rows stored later — found by Block 3's real-corpus spot-check.
+    chunks = [
+        make_chunk("dup", "First duplicate text."),
+        make_chunk("dup", "Second duplicate text."),
+        make_chunk("unique", "Unique text."),
+    ]
+    db_path = tmp_path / "lancedb"
+    build_vector_index(chunks, db_path)
+
+    texts = get_chunk_texts(db_path, ["dup", "unique"])
+
+    assert texts["unique"] == "Unique text."
