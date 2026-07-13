@@ -56,6 +56,8 @@ def extract_page_spans(pdf_path: Path) -> list[TextSpan]:
                             is_bold=bool(span["flags"] & BOLD_FLAG),
                             page_index=page_index,
                             bbox=tuple(span["bbox"]),
+                            # post-merge count: subscripts are already joined into
+                            # their base span, so "V" + "MC" counts as one span here
                             line_span_count=len(non_empty_spans),
                         )
                     )

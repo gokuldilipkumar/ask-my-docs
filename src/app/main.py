@@ -12,6 +12,9 @@ app = typer.Typer()
 
 @app.callback()
 def callback() -> None:
+    # No-op callback keeps Typer in subcommand mode: without it, a single
+    # registered command collapses to top-level and "ingest" stops being a
+    # named subcommand.
     pass
 
 

@@ -9,7 +9,7 @@ from ingest.headers import (
     detect_chapter_headers,
     detect_subsection_headers,
 )
-from ingest.models import Chunk, ChapterHeader, SubsectionHeader, TextSpan
+from ingest.models import Chunk, ChapterHeader, FigureRef, SubsectionHeader, TextSpan
 from ingest.pdf_loader import extract_page_spans
 from ingest.tokens import count_tokens
 
@@ -69,7 +69,10 @@ def apply_sliding_window(
         return [section.text]
 
     words = section.text.split()
-    target_words = max_tokens  # word count is an upper-bound proxy; count_tokens gates the real limit
+    # Approximation: windows are sized in words, but a word is >= 1 token, so a
+    # max_tokens-word window usually *exceeds* max_tokens tokens. Token-accurate
+    # windowing is open debt in BUGS.md.
+    target_words = max_tokens
     overlap_words = int(target_words * overlap_pct)
     step = target_words - overlap_words
 
@@ -114,7 +117,7 @@ def chunk_pdf(
     subsections = detect_subsection_headers(spans)
     sections = group_into_sections(spans, chapters, subsections)
 
-    figure_refs_by_page: dict[int, list] = {}
+    figure_refs_by_page: dict[int, list[FigureRef]] = {}
     for span in spans:
         ref = extract_figure_ref(span.text)
         if ref:
