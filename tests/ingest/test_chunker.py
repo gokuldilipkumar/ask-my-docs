@@ -1,3 +1,5 @@
+import pytest
+
 from ingest.pdf_loader import extract_page_spans
 from ingest.headers import detect_chapter_headers, detect_subsection_headers
 from ingest.chunker import RawSection, apply_sliding_window, chunk_pdf, group_into_sections
@@ -136,3 +138,41 @@ def test_chunk_pdf_end_to_end_produces_stable_ids(make_pdf):
     assert chunks_run1[0].chapter_title == "Energy Management"
     assert chunks_run1[0].section_title == "Total Energy"
     assert chunks_run1[1].section_title == "Kinetic Energy"
+
+
+def test_repeated_section_title_across_pages_yields_unique_chunk_ids(make_pdf):
+    # the real handbook repeats titles like "Common Errors" once per maneuver
+    # within a chapter; their chunks must not share ids
+    pdf_path = make_pdf([
+        [
+            ("Chapter 5: Maneuvers", 14, True),
+            ("Common Errors", 10, True),
+            ("Body text about slow flight errors.", 10, False),
+        ],
+        [
+            ("Common Errors", 10, True),
+            ("Body text about stall recovery errors.", 10, False),
+        ],
+    ])
+
+    chunks = chunk_pdf(pdf_path, min_tokens=400, max_tokens=600, overlap_pct=0.15)
+
+    ids = [c.chunk_id for c in chunks]
+    assert len(chunks) == 2
+    assert len(set(ids)) == len(ids)
+
+
+def test_chunk_pdf_fails_loud_on_chunk_id_collision(make_pdf):
+    # two identically-titled sections starting on the same page still collide
+    # (page_index_start can't tell them apart) — refuse to build a corpus with
+    # ambiguous ids rather than silently shipping it
+    pdf_path = make_pdf([[
+        ("Chapter 5: Maneuvers", 14, True),
+        ("Common Errors", 10, True),
+        ("Body text one.", 10, False),
+        ("Common Errors", 10, True),
+        ("Body text two.", 10, False),
+    ]])
+
+    with pytest.raises(ValueError, match="collision"):
+        chunk_pdf(pdf_path, min_tokens=400, max_tokens=600, overlap_pct=0.15)

@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -134,7 +135,12 @@ def chunk_pdf(
         for sequence, window_text in enumerate(windows):
             chunks.append(
                 Chunk(
-                    chunk_id=make_chunk_id(section.chapter_number, section.section_title, sequence),
+                    chunk_id=make_chunk_id(
+                        section.chapter_number,
+                        section.section_title,
+                        section.page_index_start,
+                        sequence,
+                    ),
                     chapter_number=section.chapter_number,
                     chapter_title=section.chapter_title,
                     section_title=section.section_title,
@@ -148,4 +154,11 @@ def chunk_pdf(
                     sequence=sequence,
                 )
             )
+    # Unique ids are a designed invariant that citations and eval references
+    # depend on — count it here rather than assume the hash scheme guarantees it
+    # (identically-titled sections starting on the same page would still collide).
+    id_counts = Counter(c.chunk_id for c in chunks)
+    collisions = {cid: n for cid, n in id_counts.items() if n > 1}
+    if collisions:
+        raise ValueError(f"chunk_id collisions: {collisions}")
     return chunks
