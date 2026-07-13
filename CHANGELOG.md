@@ -20,8 +20,11 @@ All notable changes to this project are documented here. Format loosely follows 
 - V-speed subscripts ("V" + smaller "MC"/"SO" spans, extracted separately by PyMuPDF with no superscript flag set) fragmented terms like "VMC" and broke BM25 matching for V-speed queries. Subscript spans now join their base span geometrically; "VMC" survives extraction intact in 62 spans (was 0).
 - TOC pages repeat "Chapter N: Title" lines verbatim (duplicating every detected chapter header) and Index/Glossary headings fragmented back matter into ~330 junk sections that polluted retrieval top-5s. Fixed by the body-page-range filter above. Corpus quality after both fixes: 951 → 617 chunks, median tokens 173.5 → 329, sub-50-token share 33% → 8%.
 
+- `reciprocal_rank_fusion` silently dropped rankings beyond the weights list length (`zip` without `strict=True`) — a mis-sized config would quietly turn hybrid retrieval into single-index retrieval. Now raises `ValueError` on length mismatch. Found by the audit's fresh-eyes review; Block 2's four happy-path tests all passed over it.
+
 ### Known issues (tracked in `BUGS.md`)
 - Sliding-window sizing still uses word count as a token-count proxy, which undercounts badly on numeral-dense text; 143 of 617 chunks exceed 650 tokens.
 - `SIZE_RATIO_THRESHOLD` (subsection-header font-size heuristic) is still an untuned constant.
 - Printed page labels (roman numeral / chapter-relative) are classified but not yet wired into chunk metadata.
 - Table extraction is unhandled and unverified against the real corpus.
+- `Settings` loads `config.yaml` relative to the cwd — running the CLI outside the repo root silently skips the corpus body-page-range filter (plus six smaller entropy items from the 2026-07-13 audit).
