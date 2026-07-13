@@ -10,4 +10,14 @@ def generate_answer(
 ) -> GeneratedAnswer:
     if not chunks:
         return GeneratedAnswer(answer_text=_NO_CONTEXT_ANSWER, citations=[])
-    raise NotImplementedError  # real API call lands in Chunk 4.3
+
+    scoped_client = client.with_options(max_retries=config.max_retries, timeout=config.timeout_seconds)
+    prompt = build_prompt(question, chunks)
+    response = scoped_client.messages.parse(
+        model=config.model,
+        max_tokens=config.max_tokens,
+        thinking={"type": "disabled"},
+        messages=[{"role": "user", "content": prompt}],
+        output_format=GeneratedAnswer,
+    )
+    return response.parsed_output
