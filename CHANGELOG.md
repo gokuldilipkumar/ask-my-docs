@@ -24,6 +24,8 @@ All notable changes to this project are documented here. Format loosely follows 
 
 - `reciprocal_rank_fusion` silently dropped rankings beyond the weights list length (`zip` without `strict=True`) — a mis-sized config would quietly turn hybrid retrieval into single-index retrieval. Now raises `ValueError` on length mismatch. Found by the audit's fresh-eyes review; Block 2's four happy-path tests all passed over it.
 - `get_chunk_texts`'s scan limit silently truncated results when the table holds duplicate chunk_ids (its fail-loud KeyError caught this on first real-corpus contact); chunk IDs are now SQL-escaped in the LanceDB filter string so no ID can corrupt the query.
+- **Duplicate chunk IDs (HIGH)**: `make_chunk_id` collided on section titles the handbook repeats per maneuver (617 chunks, 590 unique IDs; "Common errors..." ×5 on one ID). `page_index_start` now joins the hash, and `chunk_pdf` counts the uniqueness invariant, raising on collisions instead of shipping ambiguous IDs.
+- That collision check immediately exposed a second bug on the real corpus: text-equality header matching let stray glossary V-speed letter spans spawn bogus sections under same-page alphabet headings ("V" ×5 on p388). Headers now match by font signature (title, size, bold). Re-ingested: 617 → 612 chunks, **612/612 unique IDs in both indexes, identical ID sets**; previously-colliding chunks are now distinctly retrievable.
 
 ### Known issues (tracked in `BUGS.md`)
 - Sliding-window sizing still uses word count as a token-count proxy, which undercounts badly on numeral-dense text; 143 of 617 chunks exceed 650 tokens.
@@ -31,5 +33,4 @@ All notable changes to this project are documented here. Format loosely follows 
 - Printed page labels (roman numeral / chapter-relative) are classified but not yet wired into chunk metadata.
 - Table extraction is unhandled and unverified against the real corpus.
 - `Settings` loads `config.yaml` relative to the cwd — running the CLI outside the repo root silently skips the corpus body-page-range filter (plus six smaller entropy items from the 2026-07-13 audit).
-- **Duplicate chunk IDs in the real corpus (HIGH)**: 617 chunks, 590 unique IDs — `make_chunk_id(chapter, title, sequence)` collides on section titles the handbook repeats per maneuver ("Common errors..." ×5 on one ID). Breaks citation uniqueness and golden-dataset references; must be fixed (hash disambiguator + re-ingest) before Block 5.
 - Rerank latency on real chunks is ~5.3s per 20-candidate query on CPU (design claim of ~130ms holds only for short passages); chunks past the model's 512-token input limit are silently truncated during scoring. Block 4 decision item.
