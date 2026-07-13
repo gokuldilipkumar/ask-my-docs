@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from ingest.models import Chunk
 
 _MODEL_NAME = "BAAI/bge-small-en-v1.5"
+_TABLE_NAME = "chunks"
 _model: SentenceTransformer | None = None
 
 
@@ -30,12 +31,15 @@ def build_vector_index(chunks: list[Chunk], db_path: Path) -> None:
     ]
 
     db = lancedb.connect(str(db_path))
-    db.create_table("chunks", data=rows, mode="overwrite")
+    db.create_table(_TABLE_NAME, data=rows, mode="overwrite")
+
+
+def _open_table(db_path: Path) -> lancedb.table.Table:
+    return lancedb.connect(str(db_path)).open_table(_TABLE_NAME)
 
 
 def get_chunk_texts(db_path: Path, chunk_ids: list[str]) -> dict[str, str]:
-    db = lancedb.connect(str(db_path))
-    table = db.open_table("chunks")
+    table = _open_table(db_path)
     # Quotes are SQL-escaped so no id can corrupt the filter string (production
     # ids are hex hashes, but the signature accepts any str). No .limit(): the
     # table can hold duplicate chunk_ids (BUGS.md), so a limit sized to
@@ -55,7 +59,6 @@ def search_vector(db_path: Path, query: str, top_k: int) -> list[str]:
     model = _get_model()
     query_vector = model.encode(query, normalize_embeddings=True).tolist()
 
-    db = lancedb.connect(str(db_path))
-    table = db.open_table("chunks")
+    table = _open_table(db_path)
     results = table.search(query_vector).limit(top_k).to_list()
     return [r["chunk_id"] for r in results]

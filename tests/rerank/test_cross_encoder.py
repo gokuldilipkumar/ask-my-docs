@@ -64,17 +64,18 @@ def test_rerank_puts_semantically_relevant_candidate_first():
     assert result[0] == "rel"
 
 
-@pytest.mark.slow
-def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len():
-    candidates = [
-        ("a", "Exceeding the critical angle of attack makes the wing stop producing lift."),
-        ("b", "Weight and balance must be computed before every flight."),
-        ("c", "Radio communication procedures at towered airports."),
-    ]
-    query = "What causes an aerodynamic stall?"
+def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len(monkeypatch):
+    # truncation is pure slicing — no need for the real model (audit finding);
+    # ascending fake scores make the expected order deterministic: c > b > a
+    class FakeModel:
+        def predict(self, pairs):
+            return list(range(len(pairs)))
 
-    top2 = rerank(query, candidates, RerankConfig(enabled=True, top_k=2))
-    all3 = rerank(query, candidates, RerankConfig(enabled=True, top_k=10))
+    monkeypatch.setattr(cross_encoder, "_get_model", lambda name: FakeModel())
+    candidates = [("a", "t1"), ("b", "t2"), ("c", "t3")]
 
-    assert len(top2) == 2
-    assert sorted(all3) == ["a", "b", "c"]  # top_k beyond len returns all, no error
+    top2 = rerank("q", candidates, RerankConfig(enabled=True, top_k=2))
+    all3 = rerank("q", candidates, RerankConfig(enabled=True, top_k=10))
+
+    assert top2 == ["c", "b"]
+    assert all3 == ["c", "b", "a"]  # top_k beyond len returns all, no error

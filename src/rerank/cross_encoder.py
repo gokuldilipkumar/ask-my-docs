@@ -15,6 +15,8 @@ def _get_model(model_name: str) -> CrossEncoder:
 def rerank(query: str, candidates: list[tuple[str, str]], config: RerankConfig) -> list[str]:
     ids = [cid for cid, _ in candidates]
     if not config.enabled or not candidates:
+        # disabled skips *scoring* only: top_k truncation still applies so the
+        # contract (at most top_k ids returned) is stable regardless of the toggle
         return ids[: config.top_k]
     model = _get_model(config.model)
     scores = model.predict([(query, text) for _, text in candidates])
