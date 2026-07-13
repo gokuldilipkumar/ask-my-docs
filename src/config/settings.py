@@ -34,8 +34,9 @@ class RerankConfig(BaseModel):
 
 class GenerationConfig(BaseModel):
     model: str = "claude-sonnet-5"
+    max_tokens: int = 1024
     max_retries: int = 3
-    backoff_base_seconds: float = 1.0
+    timeout_seconds: float = 30.0
 
 
 class CitationConfig(BaseModel):
