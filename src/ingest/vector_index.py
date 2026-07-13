@@ -36,11 +36,14 @@ def build_vector_index(chunks: list[Chunk], db_path: Path) -> None:
 def get_chunk_texts(db_path: Path, chunk_ids: list[str]) -> dict[str, str]:
     db = lancedb.connect(str(db_path))
     table = db.open_table("chunks")
-    # chunk_ids are content hashes (hex), safe to embed in the filter string.
-    # No .limit(): the table can hold duplicate chunk_ids (BUGS.md), so a limit
-    # sized to len(chunk_ids) would silently truncate the scan before later rows.
-    id_list = ", ".join(f"'{cid}'" for cid in chunk_ids)
+    # Quotes are SQL-escaped so no id can corrupt the filter string (production
+    # ids are hex hashes, but the signature accepts any str). No .limit(): the
+    # table can hold duplicate chunk_ids (BUGS.md), so a limit sized to
+    # len(chunk_ids) would silently truncate the scan before later rows.
+    id_list = ", ".join("'" + cid.replace("'", "''") + "'" for cid in chunk_ids)
     rows = table.search().where(f"chunk_id IN ({id_list})").to_list()
+    # for duplicated ids, an arbitrary row's text wins — acceptable until the
+    # chunk-id uniqueness fix (BUGS.md) restores one-row-per-id
     texts = {r["chunk_id"]: r["text"] for r in rows}
     missing = [cid for cid in chunk_ids if cid not in texts]
     if missing:

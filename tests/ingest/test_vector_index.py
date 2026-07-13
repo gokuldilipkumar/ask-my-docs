@@ -45,6 +45,17 @@ def test_get_chunk_texts_raises_on_unknown_id(make_chunk, tmp_path):
 
 
 @pytest.mark.slow
+def test_get_chunk_texts_id_with_quote_cannot_corrupt_the_filter(make_chunk, tmp_path):
+    db_path = tmp_path / "lancedb"
+    build_vector_index([make_chunk("a", "Some text.")], db_path)
+
+    # a quote in an id must yield the normal missing-id KeyError,
+    # not a syntax error from a corrupted filter string
+    with pytest.raises(KeyError):
+        get_chunk_texts(db_path, ["it's-not-here"])
+
+
+@pytest.mark.slow
 def test_get_chunk_texts_tolerates_duplicate_chunk_ids_in_table(make_chunk, tmp_path):
     # The real corpus currently contains duplicate chunk_ids (repeated section
     # titles collide in make_chunk_id — tracked in BUGS.md). A scan limit sized
