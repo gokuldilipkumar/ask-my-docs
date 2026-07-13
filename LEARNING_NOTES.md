@@ -234,3 +234,19 @@ This audit produced zero Blocking findings and no code changes — just two Low 
 Re-running the spot-check outside pytest required two environment details this project's own `/audit` workflow already documents but are easy to forget in the moment: `PYTHONPATH=src` (pytest's `pythonpath` ini option doesn't apply to a bare `python -c`), and `ANTHROPIC_API_KEY` must be set (even a placeholder) because `Settings()` validates it as a required field at construction time — unrelated to what the query itself needs.
 
 ---
+
+## 2026-07-13 — Planning Block 4: catching a stale default before it shipped
+
+### A "verify at build time" comment is a debt ticket, not documentation
+`GenerationConfig.model` read `claude-sonnet-4-5` with a comment saying to verify it against the current model list at build time — written back when the design doc was drafted, before this session had access to a current model catalog. It would have been easy to read the comment as already-satisfied documentation and move on. Comments that say "verify this later" are a promise, not proof the verification happened; this session's model-provider knowledge made it possible to actually redeem that promise now, so the fix went into the plan (Chunk 4.1) instead of getting deferred a second time. Same failure shape as the false-comment lesson from the second audit: a claim sitting in the codebase is only as good as the last time someone actually checked it.
+
+### Structural safety over runtime discipline, applied a third time
+Block 2 guarded against a parallel-list mismatch with `strict=True` (runtime defense). Block 3 made the bug structurally impossible by passing `(id, text)` pairs instead of parallel lists. Block 4 extends the same instinct one layer up the stack: instead of hand-writing a prompt asking Claude to emit JSON and then parsing it hopefully, `client.messages.parse(output_format=GeneratedAnswer)` makes a malformed citation list a validation error the SDK raises, not a string the app has to defensively re-parse. Three blocks in a row, the same question paid off: can the invalid state be made unrepresentable instead of merely checked for?
+
+### A config field can be dead before it's ever used
+`backoff_base_seconds` existed in `GenerationConfig` since the original design doc, intended for hand-rolled retry backoff — but the Anthropic SDK already retries 429/5xx with its own exponential backoff via `max_retries`. Adopting the SDK-native retry made `backoff_base_seconds` genuinely unused from the moment `generate_answer` was designed, not after some later refactor. The two prior audits found *dead parameters* after the fact (a `min_tokens` argument nothing read, a config field nothing checked); this time the plan caught it *before* the field was ever wired to anything, by asking "what does this number actually control?" while deciding the retry strategy — cheaper than fixing it in a third audit.
+
+### Resolving debt without touching the code that created it
+Block 3's plan flagged a "double fetch" problem — the reranker needs chunk text to score candidates, and the generation prompt needs chunk text again for the (smaller) reranked set — and explicitly punted the decision to Block 4. The resolution didn't require changing `rerank()` at all: since reranking only ever *narrows* a candidate list, the orchestrator can keep the original `get_chunk_texts` dict in memory and look up the final ids in it, rather than querying the index a second time or changing `rerank`'s already-tested contract. When a later block owes a decision about an earlier block's design, check whether the fix belongs in the new orchestration layer before reopening code that already shipped and passed review.
+
+---
