@@ -3,6 +3,8 @@ from pathlib import Path
 PROMPT_VERSION = "answer_v1"
 _TEMPLATE_PATH = Path(__file__).parent.parent.parent / "prompts" / f"{PROMPT_VERSION}.md"
 
+NO_CONTEXT_ANSWER = "I don't have information about that in this handbook."
+
 
 def build_prompt(question: str, chunks: list[tuple[str, str]]) -> str:
     template = _TEMPLATE_PATH.read_text()

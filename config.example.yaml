@@ -15,9 +15,10 @@ rerank:
   top_k: 5
 
 generation:
-  model: claude-sonnet-4-5
+  model: claude-sonnet-5
+  max_tokens: 2048
   max_retries: 3
-  backoff_base_seconds: 1.0
+  timeout_seconds: 30.0
 
 citations:
   low_confidence_threshold: 0.7
