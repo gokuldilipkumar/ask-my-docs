@@ -29,13 +29,13 @@
 
 ## Block 4: Grounded Generation
 
-**Success criteria** (check off at build time)
-- [ ] Prompt instructs "answer only from provided context, cite by chunk_id"; template is versioned (`prompts/answer_v1.md`, a `PROMPT_VERSION` constant exposed for future Langfuse/eval attribution).
-- [ ] Empty/no retrieved chunks → `generate_answer` returns an honest "I don't have that" answer without calling the Anthropic API (asserted via a client that fails the test if called).
-- [ ] Chunks present but off-topic → model returns `citations: []` (live-API test, loose assertion; confirmed again at the real-corpus spot-check with the design doc's out-of-scope sample question).
-- [ ] Bounded retry + timeout: `generate_answer` constructs the client with `max_retries=config.max_retries` and `timeout=config.timeout_seconds` (asserted via a fast test capturing the `with_options` call — no real API needed for this assertion).
-- [ ] `answer_question` orchestrator composes retrieve → rerank → generate, reusing one `get_chunk_texts` fetch (no second DB query for the same ids).
-- [ ] Real-corpus spot-check: run all 8 design-doc sample questions end-to-end; citations resolve to real chunk_ids; the out-of-scope question yields an honest non-answer; per-query cost/latency logged.
+**Success criteria** (verified at build time, 2026-07-13)
+- [x] Prompt instructs "answer only from provided context, cite by chunk_id"; template is versioned (`prompts/answer_v1.md`, a `PROMPT_VERSION` constant exposed for future Langfuse/eval attribution).
+- [x] Empty/no retrieved chunks → `generate_answer` returns an honest "I don't have that" answer without calling the Anthropic API (asserted via a client that fails the test if called).
+- [x] Chunks present but off-topic → model returns `citations: []` (live-API test; required a prompt fix — see Chunk 4.4 — confirmed again at the real-corpus spot-check with the design doc's out-of-scope sample question).
+- [x] Bounded retry + timeout: `generate_answer` constructs the client with `max_retries=config.max_retries` and `timeout=config.timeout_seconds` (asserted via a fast test capturing the `with_options` call — no real API needed for this assertion).
+- [x] `answer_question` orchestrator composes retrieve → rerank → generate, reusing one `get_chunk_texts` fetch (no second DB query for the same ids).
+- [x] Real-corpus spot-check: ran all 8 design-doc sample questions end-to-end. Citations resolve to real chunk_ids on 7/8; question 8 (out-of-scope) yields an honest non-answer with empty citations. Question 6 crashed on first run (`max_tokens=1024` too low for a detailed answer, truncating structured JSON) — fixed via TDD (clear `RuntimeError`, `max_tokens` raised to 2048) and re-verified. Question 3 (short-field vs. soft-field takeoff) answered only half the comparison — a retrieval/rerank surfacing gap, logged to `BUGS.md` as input for Block 6's golden dataset, not fixed in this block. Per-query latency logged (8–30s, dominated by generation for longer answers); per-query token cost not captured — `generate_answer` discards `response.usage`, logged as a Block 7 debt item.
 
 ---
 
