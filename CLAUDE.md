@@ -10,7 +10,7 @@
 
 ## Rules
 - TDD is non-negotiable: no production code without a failing test first.
-- Update `PROJECT_HISTORY.md` per session; decisions go in `.agent/decisions.log`.
+- Update `PROJECT_HISTORY.md` per session; decisions go in `.agent/decisions.log`; the *why/how* behind each session's work goes in `LEARNING_NOTES.md` (the user's primary learning artifact — never skip it at closeout).
 - Atomic commits: `[Action] [Scope]: [Change]`.
 - Config-driven, no magic numbers (chunk size, RRF weights, thresholds all in config).
 

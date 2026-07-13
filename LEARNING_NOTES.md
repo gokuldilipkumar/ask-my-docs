@@ -87,3 +87,104 @@ Rather than guessing at chunk boundaries from the seed spec alone, I opened the 
 **Key lesson**: "Propose the chunking strategy once you can see the actual PDF" (from the seed spec) isn't just process ceremony — the single-column confirmation, the chapter-vs-subsection heading detectability gap, and the missing table captions are all facts that would have been *wrong guesses* if chunking design had happened before opening the file. Real inspection changed two concrete decisions: the ingestion library (PyMuPDF for font metadata, not plain text extraction) and the citation page-number format (chapter-relative, matching the source document's own scheme).
 
 ---
+
+## 2026-07-11 — Plan: environment, scoped planning, synthetic fixtures
+
+### Why `uv` (and what it replaced)
+This machine has no system Python at all — only the Windows Store stub aliases. `uv` was already installed and already had Python 3.11.8 provisioned, so it became the everything-tool: Python version management (replacing pyenv), virtualenv creation (replacing `python -m venv`), and dependency resolution with a lockfile (`pyproject.toml` + `uv.lock`, replacing `requirements.txt`). One tool, one lockfile, zero "which Python am I on" ambiguity. Every command in this project runs as `uv run <cmd>` — it transparently ensures the right interpreter and environment.
+
+### The `src/`-layout, and why nothing needs `pip install -e .`
+Packages live under `src/` (e.g. `src/ingest/`, `src/retrieval/`) rather than at repo root. The classic reason: with root-level packages, `import ingest` can accidentally resolve against the *working directory* rather than the installed package, hiding packaging bugs. The classic *cost*: you normally need an editable install for tests to find the code. The shortcut used here: pytest's `pythonpath = ["src"]` ini option injects `src/` onto `sys.path` for test runs only — no install step, no egg-info clutter. **The catch discovered later**: this only applies *inside pytest*. A manual `python -m app.main` doesn't get it, and needs `PYTHONPATH=src` set explicitly. Convenience shortcuts have scope; know where the scope ends.
+
+### Scoped planning: full detail only for what you can see
+The plan gives exact TDD test code for Block 0-1 only; Blocks 2-9 are sketched at block level. The reasoning: later blocks' test design depends on ingestion's *actual output shapes* (what a `Chunk` looks like, what real corpus statistics are), which don't exist yet. Writing exact test code against guessed schemas is designing against fiction — you'd pay twice: once writing it, once rewriting it. Plans should be detailed exactly as far as real information extends, and no further.
+
+### Synthetic in-memory PDF fixtures
+Ingestion tests build tiny PDFs at test time via PyMuPDF's own authoring API (`fitz.open()` + `insert_text(fontname="hebo")` — the built-in Helvetica-bold controls the bold flag). Rejected: checking in binary PDF fixtures. Why: in-memory fixtures are fast, deterministic, and *reviewable as plain Python* — a code reviewer can read exactly what the test document contains. The real 273MB handbook is gitignored and only touched by manual spot-check steps. (The limits of synthetic fixtures became a theme later — see the inline-bold bug below.)
+
+---
+
+## 2026-07-11 — Block 0+1 build: three library surprises and the inline-bold header bug
+
+### Verify third-party APIs before writing tests against them
+Three planned test designs turned out to assume library behavior that doesn't exist:
+1. **pydantic-settings**: `YamlConfigSettingsSource` doesn't support a per-instance `_yaml_file` init-kwarg override the way `_env_file` does — the yaml path is fixed in `model_config` at class level.
+2. **typer**: with only one `@app.command()` registered, typer silently collapses to *single-command mode* — the command name disappears from the CLI. `runner.invoke(app, ["ingest", ...])` fails until an empty `@app.callback()` forces multi-command mode. (That's why `main.py` has a no-op callback.)
+3. **PYTHONPATH**: pytest's `pythonpath` ini doesn't apply outside pytest (above).
+
+**Key lesson**: plan-time example code is a best guess, not a verified contract. A 5-line throwaway script that exercises the real library before writing the RED test costs a minute and prevents debugging a *test* while believing you're debugging *production code*. This became a permanent `/build` workflow step.
+
+### The inline-bold header bug — synthetic fixtures encode your assumptions
+The subsection-header heuristic was "bold and/or larger font ⇒ header." All 27 tests passed, because every synthetic fixture was built under the same assumption: bold text appears on its own line. The real FAA handbook bolds *inline field labels mid-sentence* ("**Rule #1:** If you want to move...", "**Throttle:** increase power..."). Every one of those was classified as a section header, fragmenting the corpus into 1,850 chunks with a **29-token median** against a 400-600 target — 60% of chunks under 50 tokens.
+
+The fix: `TextSpan` gained `line_span_count` (how many spans share its physical PDF line), and a header must be the *sole content of its line*. Inline bold shares a line with surrounding text; true headers don't. Re-ingestion: 1,850 → 1,008 chunks, median 29 → 173.5 tokens.
+
+**Key lessons**:
+- A synthetic fixture can only fail in ways you already imagined. Real-corpus spot-checks are where unknown-unknowns surface — schedule them explicitly (Chunk 1.14 was exactly that, and it worked).
+- When a real-corpus bug is found, the fix still goes through TDD: first a *synthetic fixture reproducing the failure* (a page with inline bold mid-sentence), watch it fail, then fix. That turns a one-off patch into a permanent regression guard.
+- Corpus statistics (chunk count, median tokens, sub-50 share) are the observability layer for ingestion quality — a heuristic bug showed up as a *distribution shift*, not an exception.
+
+### Word count is not a token count
+The sliding-window fallback sized windows by word count as a proxy for tokens. On prose that's roughly fine; on numeral-dense text it fails badly — a 600-word chunk measured **1,275 actual tokens**, because BPE tokenizers explode strings like "9-37" into several subword tokens each. Words are a *lower bound* on tokens, and the gap is content-dependent, so a fixed word target can't enforce a token ceiling. (Still open debt — the real fix is trimming by actual `count_tokens()` measurement.)
+
+---
+
+## 2026-07-11 — First audit & kaizen: fresh-eyes review and compound engineering
+
+### Why a zero-context reviewer catches what the author's tests miss
+The audit spawns a subagent that sees *only the changed files* — no plan, no conversation history, no justifications. It found a real bug all 28 tests missed: `apply_sliding_window` accepted a `min_tokens` parameter it never referenced, so a long section's trailing window could be an arbitrarily tiny orphan fragment. Why did tests miss it? Because the author writes tests for the behaviors they were thinking about, and the author *thought* `min_tokens` was enforced — the same blind spot produces both the bug and the missing test. A reviewer without the author's context reads the signature and asks "where is this parameter used?" — a question the author never asks because they "know" the answer.
+
+### Triage protects against reviewer over-eagerness
+Review findings get bucketed: **Blocking** (fix now), **Improvement** (log as debt), **Nitpick** (acknowledge, skip). The judgment call worth remembering: a `dict.setdefault().append()` grouping pattern appeared three times, but across three *different value shapes* — extracting a generic `group_by()` would be premature abstraction, forcing three unrelated usages through one interface. Duplication count alone doesn't decide; whether the duplicates are genuinely the *same concept* does.
+
+### Kaizen = encoding lessons into the process, not just remembering them
+Both of this session's hard-won lessons (verify library APIs first; sample real corpus excerpts before writing synthetic fixtures for heuristics) were written *into the workflow files themselves*. The insight: a lesson in a human's (or model's) memory decays; a lesson in the checklist that every future session executes compounds. This is the "compound engineering" idea — the process improves itself as a side effect of doing the work.
+
+---
+
+## 2026-07-11 — Block 2: hybrid retrieval, and probe-verifying model-dependent tests
+
+### The reuse audit: sometimes the right amount of new code is almost none
+Block 2's plan started with a reuse audit and found Block 1 had already built everything retrieval needs (`search_bm25`, `search_vector`, index loaders). So the retrieval layer is two functions: `reciprocal_rank_fusion` (a pure function over ranked ID lists) and `hybrid_retrieve` (an orchestrator calling existing search functions). No wrapper modules, no adapter classes. YAGNI applied at the architecture level.
+
+### Probe-verified fixtures: don't guess what a model will do
+The plan's weight-flip test fixture assumed a keyword-stuffed chunk would win BM25 while a semantic chunk won vector search. At RED time, probing showed the embedding model *also* ranked the keyword-stuffed chunk first — the fixture didn't discriminate, and the test would have passed for the wrong reason. The replacement fixture was verified against the real models before the test was finalized: a semantic stall description vs. an off-topic keyword-"stall" chunk, with measured margins (BM25 0.46-vs-0.0 one way, vector 0.70-vs-0.60 the other).
+
+**Key lesson**: any test assertion that depends on *model behavior* (embeddings, rankers) is a hypothesis, not a fact, until probed against the actual model. This is the retrieval-layer analog of "verify the library API first."
+
+### Spot-checks generate evidence for deferred decisions
+The Block 2 real-corpus spot-check did double duty: it confirmed fusion weights are load-bearing (flipping bm25/vector weights changes the #1 result on 2 of 3 sample queries — the design doc's acceptance criterion), and it produced the *first real evidence* on two questions deliberately deferred from Block 1: back-matter chunks were polluting top-5 results (decision: filter them), and V-speed queries surfaced nothing (new finding: subscript fragmentation). Deferring a decision until real signal exists, then collecting that signal deliberately, beats guessing early — but only if the deferred question is *logged* so it doesn't silently evaporate (`BUGS.md` did that job).
+
+---
+
+## 2026-07-12 — Ingestion fixes: geometric subscript joining and body-page-range filtering
+
+### When the metadata lies, geometry is the fallback
+The handbook typesets V-speeds as "V" plus a smaller subscript span ("MC", "SO"). PyMuPDF has a superscript/subscript flag — and it is simply *not set* on these spans. Probing real span data (before writing any fix) established the only reliable signal is geometric: the subscript is <0.8× the base font size, starts within 1pt of where the base span ends, and sits shifted below the base's top edge. The join happens at extraction time so "VMC" is intact everywhere downstream — chunks, indexes, citations. Rejected alternative: normalizing at the tokenizer/search layer, which would have fixed BM25 matching but left citation text reading "V MC".
+
+**Key lesson**: extraction bugs should be fixed at extraction, not patched downstream — every downstream consumer (search, display, citations) inherits the fix for free. And: probe the real data *first*, then write the synthetic RED fixture to match verified reality (the fixture reproduces the flag-not-set behavior because we checked; a guessed fixture might have set the flag and tested a fantasy).
+
+### Order of operations matters: filter before detect
+Front/back matter wasn't just low-value retrieval content — it was *corrupting structure detection*. TOC pages repeat "Chapter N: Title" lines verbatim, so every chapter header was detected twice (once at its real page, once in the TOC); Index/Glossary alphabet headings ("V", "S") and page-number labels fragmented back matter into ~330 junk sections (chapter 18 alone held 402 of 951 chunks). That's why the filter drops spans *before* header detection rather than dropping chunks after chunking — filtering after would leave the duplicate chapter anchors and fragmented sections in place. The page range (21-390) lives in `config.yaml`, not code: it's a fact about *this corpus*, not logic. Glossary kept (real definitional content — a glossary chunk now answers the VMC/VSO query); TOC and Index dropped.
+
+Corpus after both fixes: 951 → 617 chunks, median tokens 173.5 → 329, sub-50-token share 33% → 8%.
+
+### Repo config can poison tests
+Adding the corpus-specific page range to `config.yaml` broke the CLI tests: they invoke the real `ingest` command, which reads the repo's `config.yaml` (cwd-relative), whose page range 21-390 filtered the 1-2 page synthetic test PDFs down to *zero* chunks. Fix: the tests chdir into a tmp dir with a minimal config. **Key lesson**: any config key whose *value* is corpus- or environment-specific will leak into every test that implicitly reads the repo config — isolate those tests the moment such a key is introduced (now a `/build` workflow rule).
+
+---
+
+## 2026-07-13 — Second audit & kaizen: silent-contract bugs and false comments
+
+### The silent-truncation bug class
+`reciprocal_rank_fusion` iterated `zip(rankings, weights)`. Python's `zip` stops at the *shorter* input — so a weights list shorter than the rankings list would silently drop entire rankings from the fusion. Concretely: a mis-sized config could turn "hybrid retrieval" into single-index retrieval with no error, no log, no failing test — just quietly worse results. The fix is one word (`strict=True`, Python 3.10+), which makes the mismatch raise `ValueError`.
+
+The deeper point: Block 2 wrote four tests for this function, all passing, none catching this — because all four tested *planned behavior* (fusion math, weighting effects). Contract violations (mismatched parallel inputs, empty inputs, unused parameters) are a different category that happy-path TDD systematically misses, and this is the *second consecutive audit* to find one (the dead `min_tokens` parameter was the first). Hence the new `/build` rule: every chunk's RED tests include at least one contract case, and prefer APIs that fail loudly over ones that silently degrade.
+
+### Comments are claims, and claims can be false
+A comment in the windowing code read "word count is an upper-bound proxy; count_tokens gates the real limit" — wrong on both halves (word count is a *lower* bound on tokens; `count_tokens` doesn't gate split windows at all). It was written during the *previous audit's own fix* and survived that audit's review. A false comment is worse than no comment: it actively teaches the next reader the wrong model. New audit rule: comments making factual/quantitative claims get verified against the code like any other artifact.
+
+### Checklists should encode *your* failure classes
+The `/audit` workflow file turned out to be an inherited template from a different stack — npm/Vitest/Supabase/React checks, a grep of a file that doesn't exist, a pointer to a nonexistent reference doc. Every audit paid a mental filtering tax. The kaizen rewrite replaced it with checks derived from *this repo's actual observed failures*: contract checks (dead params, strict zip), comment integrity, index-rebuild-after-schema-change, corpus spot-checks. **Key lesson**: a checklist is only compound-engineering if it encodes what *this* project actually gets wrong; a borrowed checklist encodes someone else's history.
+
+---

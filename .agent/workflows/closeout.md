@@ -16,10 +16,10 @@ Use this workflow to wrap up a development session and maintain a clean project 
 
 ## The Process
 
-### 1. Integration of Learnings
-- **Pull Lessons**: Retrieve the "Lessons Learned" established in the recent `/kaizen` session.
-- **Update Lessons Artifact**: Ensure `docs/lessons_learned.md` is current — prepend a new dated entry at the top.
-- **Update Gotchas**: If any new failure pattern was identified this session (a new "Tell", a silent bug, a wrong assumption), append it to `.agent/gotchas.md` in the appropriate section. Include: the pattern name, a code example showing wrong vs. right, and the "Tell" that signals the problem. Update the "Last updated" line at the bottom of the file.
+### 1. Integration of Learnings — `LEARNING_NOTES.md` (REQUIRED, never skip)
+- Append a dated entry to `LEARNING_NOTES.md` for this session. This is the user's primary learning artifact from the project — it is as mandatory as `PROJECT_HISTORY.md`.
+- Content: the *why* and *how it works* behind what was built or found — concept explanations, failure patterns (the wrong assumption, the "tell" that exposed it, the fix's reasoning), and rejected alternatives. Not a changelog rehash: `PROJECT_HISTORY.md` records what happened; `LEARNING_NOTES.md` teaches why it mattered.
+- Good sources: this session's `/kaizen` friction points, audit findings, decisions.log entries, and any moment where reality contradicted the plan or a library/model surprised us.
 
 ### 2. Documentation Update
 - **Project History**: Update `PROJECT_HISTORY.md` — prepend a new dated entry at the top with:
