@@ -33,7 +33,7 @@ class RerankConfig(BaseModel):
 
 
 class GenerationConfig(BaseModel):
-    model: str = "claude-sonnet-4-5"  # verify against current Anthropic model list at build time
+    model: str = "claude-sonnet-5"
     max_retries: int = 3
     backoff_base_seconds: float = 1.0
 

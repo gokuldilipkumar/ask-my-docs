@@ -19,7 +19,7 @@ rerank:
   top_k: 5
 
 generation:
-  model: claude-sonnet-4-5
+  model: claude-sonnet-5
   max_retries: 3
   backoff_base_seconds: 1.0
 
