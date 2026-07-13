@@ -8,16 +8,13 @@ Use this workflow to ensure code is production-ready and aesthetically perfect b
 
 ## 1. Technical Audit (The "Engine" Check)
 Inspect the implementation for reliability and performance.
-*   **P0 Standards**: Consult `.agent/REFERENCE.md` for the Technical Reliability checklist (Timeouts, Idempotency, etc.).
-*   **Test Verification**: Run the test suite. If tests are missing or failing, the audit is **FAILED**.
-*   **Test Data Parity**: If any core validation rules (e.g., UUID formats, token shapes, or required fields) were changed during development, visually verify that Vitest `.mockResolvedValue` stubs and test objects reflect the new strict shapes BEFORE running `npm test`, preventing cascading false-positive failures.
-*   **Schema Integrity**: Run `npm test tests/infrastructure/schema.test.ts`. If columns are missing or data types have drifted without a migration, the audit is **FAILED**.
-*   **Filter String Wildcards**: If any new code uses Supabase `.or()` with inline filter strings, verify `ilike` patterns use `*` (not `%`). Example: `url.ilike.*linkedin.com*`. The `%` form silently returns no rows when used inside a filter string.
-*   **Hooks-in-Lists**: Grep new list-rendering components for hook calls (`use`) inside `.map()` callbacks. Any hook called inside a loop is a Rules of Hooks violation — extract to a sub-component.
-*   **Dead Component Check**: For every new component added this phase, verify it is imported and rendered somewhere. Search for its name — if the only match is its own file, it is not wired in. Treat this as a Critical bug.
-*   **Path Sanitation**: Verify no URL-encoded directories (e.g., `%5Bid%5D`) exist in the `src/app` tree. These cause silent routing conflicts.
-*   **CSS Variable Integrity**: Grep new CSS/HTML files for self-referencing variables (e.g., `--var: var(--var)`) or undefined fallbacks. Example: `grep -n "var(--[a-z-]*): *var(--[a-z-]*)" src/**/*.{css,html}`. Any hit is a P0 (invisible/broken UI).
-*   **CLI Entry Points**: For any tool with a `main()` or entry point handler, verify it uses ESM-safe detection (`import.meta.url` + `fileURLToPath()`) or CommonJS-safe detection (`require.main === module`), not substring matching on `process.argv[1]`. Substring patterns are fragile and break if the script is renamed or wrapped.
+*   **Test Verification**: Run `uv run pytest -q` (full suite, slow tests included). If tests are missing or failing, the audit is **FAILED**.
+*   **Fixture Parity**: If model/schema shapes changed this phase (e.g. `ingest.models`), verify shared conftest fixtures (`make_chunk`, `make_pdf`) and test stubs reflect the new shapes BEFORE running the suite, preventing cascading false failures.
+*   **Index Integrity**: If `Chunk` fields or chunking behavior changed, both indexes (`bm25`, `lancedb`) must be rebuilt from a fresh ingest before any spot-check — stale indexes silently serve the old schema/corpus.
+*   **Dead Code Check**: For every new public function or module this phase, verify it is imported somewhere other than its own file and its tests. If the only match is its own file, it is not wired in — treat as a finding.
+*   **Contract Check**: For every new/changed function signature, verify (a) each parameter is referenced in the body, and (b) parallel-collection inputs fail loudly on length mismatch (`zip(..., strict=True)`), never silently truncate. Both bug classes shipped past happy-path TDD here: a dead `min_tokens` parameter, and RRF's `zip` silently dropping a whole ranking.
+*   **Comment Integrity**: For comments added or changed this phase that state factual or quantitative claims ("X is an upper bound", "Y gates Z"), verify each claim against the code. A false comment shipped inside a previous audit's own fix and survived a full audit cycle.
+*   **CLI Entry Points**: Any manual (non-pytest) CLI invocation needs `PYTHONPATH=src` — `python -m app.main` does not pick up the src-layout the way pytest's `pythonpath` ini option does.
 
 ### Clean Code (Entropy Review)
 Spawn a fresh subagent with **only** the changed files as context — no plan doc, no conversation history, no justification. Use `git diff --name-only HEAD~N` to identify files modified this phase. Give the subagent this prompt:
@@ -34,14 +31,11 @@ Triage findings into three buckets:
 
 Fix all Blocking issues and re-run tests. If blocking issues were fixed, re-run the subagent on the updated files until its highest-severity finding is Improvement or lower. Note: the subagent will sometimes critique intentional simplicity as "missing abstraction" — the right amount of complexity is the minimum needed for the current task.
 
-## 2. UX & Aesthetic Audit (The "Chassis" Check)
-Verify the interface and user interaction.
-*   **Design Standards**: Consult `.agent/REFERENCE.md` for Visual and Interaction standards (Teal anchor, Spring physics).
-*   **Documentation Freshness**: Grep `NEXT.md` and `docs/` for stale status markers: `grep -n "Ready to Build\|In progress\|Pending\|Blocked" NEXT.md docs/*.md`. Cross-check against git history and current branch state. If a phase shows as "Ready" or "In progress" but commits exist for that phase from this session, mark as debt and update status.
-*   **Manual Verification**: 
-    1. Run `npm run dev`.
-    2. Open [http://localhost:3000].
-    3. Verify responsiveness, Dark Mode parity, and "The Librarian" brand voice.
+## 2. Documentation & Corpus Audit (The "Chassis" Check)
+No frontend exists — verify the artifacts a hiring manager will read, and the retrieval behavior itself.
+*   **Documentation Freshness**: Grep for stale status markers: `grep -in "ready to build\|in progress\|pending\|not yet built" docs/plans/*.md BUGS.md PROJECT_HISTORY.md`. Cross-check against git history. If a phase shows as pending but its commits exist, update the status.
+*   **Real-Corpus Spot-Check**: If ingestion or retrieval code changed this phase, re-run the spot-check queries against the real handbook indexes and compare with the previous session's findings. Synthetic-fixture tests cannot catch corpus-level regressions (fragmented headers, polluted top-5s).
+*   **Portfolio Quality**: Any README / eval report / architecture doc touched this phase must read presentation-quality (CLAUDE.md's hiring-manager audience).
 
 ## 3. Results & Remediation
 *   **Small Fixes**: Correct minor typos, spacing, or color variables immediately.
@@ -51,7 +45,7 @@ Verify the interface and user interaction.
     ```
     Include: what moves, exact source location, destination, and every affected import site. An agent given this template can execute the fix without any investigation step.
 *   **Audit Status**:
-    *   ✅ **PASS**: Specs met, P0s satisfied, Aesthetics verified.
-    *   ❌ **FAIL**: Known bugs, P0 violations, or UX drift.
+    *   ✅ **PASS**: Specs met, suite green, docs/corpus checks verified.
+    *   ❌ **FAIL**: Known bugs, failing tests, or stale docs left uncorrected.
 
 **Next Step**: Once audit is passing, run `/kaizen` followed by `/closeout`.
