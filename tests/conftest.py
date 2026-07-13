@@ -1,9 +1,19 @@
+import os
 from pathlib import Path
 
 import fitz
 import pytest
 
 from ingest.models import Chunk
+
+
+def pytest_collection_modifyitems(config, items):
+    if os.environ.get("RUN_LIVE_API_TESTS") == "1":
+        return
+    skip_live = pytest.mark.skip(reason="set RUN_LIVE_API_TESTS=1 to run tests that call the real Anthropic API")
+    for item in items:
+        if "live_api" in item.keywords:
+            item.add_marker(skip_live)
 
 
 @pytest.fixture
