@@ -33,6 +33,24 @@ def build_vector_index(chunks: list[Chunk], db_path: Path) -> None:
     db.create_table("chunks", data=rows, mode="overwrite")
 
 
+def get_chunk_texts(db_path: Path, chunk_ids: list[str]) -> dict[str, str]:
+    db = lancedb.connect(str(db_path))
+    table = db.open_table("chunks")
+    # chunk_ids are content hashes (hex), safe to embed in the filter string
+    id_list = ", ".join(f"'{cid}'" for cid in chunk_ids)
+    rows = (
+        table.search()
+        .where(f"chunk_id IN ({id_list})")
+        .limit(len(chunk_ids))
+        .to_list()
+    )
+    texts = {r["chunk_id"]: r["text"] for r in rows}
+    missing = [cid for cid in chunk_ids if cid not in texts]
+    if missing:
+        raise KeyError(f"chunk_ids not found in index: {missing}")
+    return texts
+
+
 def search_vector(db_path: Path, query: str, top_k: int) -> list[str]:
     model = _get_model()
     query_vector = model.encode(query, normalize_embeddings=True).tolist()
