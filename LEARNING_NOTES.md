@@ -188,3 +188,27 @@ A comment in the windowing code read "word count is an upper-bound proxy; count_
 The `/audit` workflow file turned out to be an inherited template from a different stack — npm/Vitest/Supabase/React checks, a grep of a file that doesn't exist, a pointer to a nonexistent reference doc. Every audit paid a mental filtering tax. The kaizen rewrite replaced it with checks derived from *this repo's actual observed failures*: contract checks (dead params, strict zip), comment integrity, index-rebuild-after-schema-change, corpus spot-checks. **Key lesson**: a checklist is only compound-engineering if it encodes what *this* project actually gets wrong; a borrowed checklist encodes someone else's history.
 
 ---
+
+## 2026-07-13 — Block 3: cross-encoder reranking
+
+### Designing a bug class out of existence
+The RRF zip bug (silently dropped rankings when parallel lists mismatched) got a `strict=True` guard — a *runtime* defense. Block 3's `rerank()` went one better: candidates are `(chunk_id, text)` **pairs**, so there are no parallel lists to mismatch. The lengths can't disagree because there's only one list. Guard-rails catch a bad state at runtime; API shape can make the bad state *unrepresentable*. When you find a bug class, ask whether the next API you design can exclude it structurally rather than defensively.
+
+### Untested defensive code is where silent bugs live
+The probe had just demonstrated that LanceDB plain filter scans have no default row cap. I added `.limit(len(chunk_ids))` anyway — "cheap insurance." That line became the bug: the table holds duplicate chunk_ids, duplicates inflated the match count past the limit, and the scan silently truncated before reaching later rows. The insurance *caused* the exact failure mode (silent truncation) it vaguely gestured at preventing. Two lessons stacked here:
+1. Defensive code is still code — it can be wrong, and because "it's just insurance," nobody writes a test for it, which is precisely why its failures are silent.
+2. A defense against a threat your own probe just disproved isn't caution, it's superstition. Either the threat is real (then probe it and test the defense) or it isn't (then the defense is untested complexity).
+
+### A designed invariant nobody counts is a hope, not an invariant
+"Content-hash chunk IDs are stable and unique" was a design cornerstone from day one — citations, golden-dataset references, and re-ingestion stability all lean on it. It was also false for two whole blocks: 617 chunks, 590 unique IDs, with one ID shared by *five different chunks* (the handbook repeats section titles like "Common errors..." per maneuver within a chapter, and the hash input — chapter, title, sequence — can't tell them apart). Nothing caught it because nothing counted: no ingest-time assertion, no test, no spot-check ever compared row count to unique-ID count. The check is one line of Python. **Key lesson**: every invariant a design *states*, some artifact must *verify* — an uncounted invariant isn't guaranteed by the elegance of the scheme that's supposed to produce it. (Found only because `get_chunk_texts` fails loud: the KeyError from the limit bug forced the diagnosis that exposed the duplicates.)
+
+### Fail-loud contracts find other people's bugs too
+`get_chunk_texts` raises `KeyError` when a requested ID isn't found, rather than returning what it has. On its very first real-corpus contact, that KeyError fired — and the investigation it forced uncovered both the limit bug (mine, hours old) and the duplicate-ID bug (ingestion's, two blocks old). A lenient version returning partial results would have run "fine": the reranker would have quietly scored 16 of 20 candidates, results would look plausible, and both bugs would have survived into Block 5's citations. Silent degradation doesn't just hide its own bug — it hides every upstream bug whose symptom it swallows.
+
+### Performance probes must use production-shaped inputs
+The design doc claimed ~130ms per 16-candidate rerank batch. My API probe measured 63ms/16 — claim confirmed, ship it? Real corpus: **5.3 seconds** per 20-candidate query, an ~80x gap. The probe used short strings; real chunks have a 329-token median, and transformer inference cost grows steeply with sequence length (attention is quadratic in it). The probe verified the API contract but *invalidated nothing about the claim*, because the claim was only ever false at production lengths. Bonus trap discovered in the same investigation: the cross-encoder silently truncates input past 512 tokens, so oversized chunks (the open windowing debt) aren't even fully scored — two debts interacting invisibly.
+
+### Truncation-on-disabled: contract stability beats purity
+`enabled=False` still truncates to `top_k` rather than being a byte-pure passthrough. Argument for purity: "disabled means the stage does nothing." Argument for truncation: downstream consumers get "at most top_k chunks" as an *invariant of the function*, regardless of a config toggle — a generator prompt built for 5 chunks never suddenly receives 20 because someone A/B'd the reranker. When a stage can be toggled off, decide which of its output guarantees survive the toggle, and keep the ones downstream code depends on.
+
+---
