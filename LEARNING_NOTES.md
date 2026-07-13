@@ -221,3 +221,16 @@ The header-matching fix generalizes: when a detector identifies *specific items*
 `enabled=False` still truncates to `top_k` rather than being a byte-pure passthrough. Argument for purity: "disabled means the stage does nothing." Argument for truncation: downstream consumers get "at most top_k chunks" as an *invariant of the function*, regardless of a config toggle — a generator prompt built for 5 chunks never suddenly receives 20 because someone A/B'd the reranker. When a stage can be toggled off, decide which of its output guarantees survive the toggle, and keep the ones downstream code depends on.
 
 ---
+
+## 2026-07-13 — Auditing the chunk-id fix: verify claims, don't relay them
+
+### "The log says it's true" is not the same as verifying it's true
+The previous session's `PROJECT_HISTORY.md` entry already claimed "612/612 unique ids in both indexes, id sets identical" and a working crosswind spot-check. It would have been easy to treat that as settled and move straight to `/plan` Block 4. Instead this audit re-ran both checks independently — reading the actual index files (`corpus_ids.json` for BM25, a live `table.search().to_list()` scan for LanceDB) and re-issuing the crosswind/VMC queries through `hybrid_retrieve`. They matched the log, which is the good outcome, but the point of an audit is that this was earned, not assumed. A session's own notes about its own work are a claim, not a proof — the same standard this project applies to LLM-generated citations (verify against the source chunk) applies to *human/agent-generated session notes* about test results.
+
+### A clean audit is still worth running
+This audit produced zero Blocking findings and no code changes — just two Low debt items from a fresh-eyes review. It would have been reasonable to skip it and go straight to planning Block 4. The value wasn't in finding a bug; it was in *confirming* the chunk-id fix's claimed invariants hold under independent re-check before building three more blocks (generation, citations, eval) on top of them. An audit that finds nothing isn't a wasted audit if it was the first time the claim was checked by someone (something) other than the code that's supposed to satisfy it.
+
+### Practical note: manual CLI checks need `PYTHONPATH=src` and a placeholder API key
+Re-running the spot-check outside pytest required two environment details this project's own `/audit` workflow already documents but are easy to forget in the moment: `PYTHONPATH=src` (pytest's `pythonpath` ini option doesn't apply to a bare `python -c`), and `ANTHROPIC_API_KEY` must be set (even a placeholder) because `Settings()` validates it as a required field at construction time — unrelated to what the query itself needs.
+
+---
