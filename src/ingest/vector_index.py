@@ -41,13 +41,13 @@ def _open_table(db_path: Path) -> lancedb.table.Table:
 def get_chunk_texts(db_path: Path, chunk_ids: list[str]) -> dict[str, str]:
     table = _open_table(db_path)
     # Quotes are SQL-escaped so no id can corrupt the filter string (production
-    # ids are hex hashes, but the signature accepts any str). No .limit(): the
-    # table can hold duplicate chunk_ids (BUGS.md), so a limit sized to
-    # len(chunk_ids) would silently truncate the scan before later rows.
+    # ids are hex hashes, but the signature accepts any str). No .limit(): a
+    # limit sized to len(chunk_ids) silently truncates the scan when the table
+    # holds duplicate ids — ingest forbids duplicates now, but this function
+    # must not assume every table it reads was built under that guarantee.
     id_list = ", ".join("'" + cid.replace("'", "''") + "'" for cid in chunk_ids)
     rows = table.search().where(f"chunk_id IN ({id_list})").to_list()
-    # for duplicated ids, an arbitrary row's text wins — acceptable until the
-    # chunk-id uniqueness fix (BUGS.md) restores one-row-per-id
+    # if duplicates do exist, an arbitrary row's text wins
     texts = {r["chunk_id"]: r["text"] for r in rows}
     missing = [cid for cid in chunk_ids if cid not in texts]
     if missing:
