@@ -162,6 +162,26 @@ def test_repeated_section_title_across_pages_yields_unique_chunk_ids(make_pdf):
     assert len(set(ids)) == len(ids)
 
 
+def test_body_span_matching_a_header_title_does_not_start_a_new_section(make_pdf):
+    # Real-corpus case (glossary p388): V-speed notation leaves stray standalone
+    # "V" spans whose *text* equals the page's alphabet heading "V". Only spans
+    # with the header's own font signature (size, bold) may start a section —
+    # text-equality matching spawned five bogus same-page "V" sections.
+    pdf_path = make_pdf([[
+        ("Chapter 18: Glossary", 14, True),
+        ("V", 12, True),                                  # real heading: larger, bold
+        ("V1 . Critical engine failure speed.", 10, False),
+        ("V", 10, False),                                 # stray body-sized span
+        ("FE . Maximum flaps-extended speed.", 10, False),
+    ]])
+
+    chunks = chunk_pdf(pdf_path, min_tokens=400, max_tokens=600, overlap_pct=0.15)
+
+    assert len(chunks) == 1
+    assert chunks[0].section_title == "V"
+    assert "FE . Maximum flaps-extended speed." in chunks[0].text
+
+
 def test_chunk_pdf_fails_loud_on_chunk_id_collision(make_pdf):
     # two identically-titled sections starting on the same page still collide
     # (page_index_start can't tell them apart) — refuse to build a corpus with

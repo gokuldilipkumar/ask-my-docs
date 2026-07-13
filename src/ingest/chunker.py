@@ -35,9 +35,14 @@ def group_into_sections(
     chapters: list[ChapterHeader],
     subsections: list[SubsectionHeader],
 ) -> list[RawSection]:
-    header_titles_by_page: dict[int, set[str]] = {}
+    # Match header spans by full font signature, not text alone: body spans can
+    # share a header's text (glossary V-speed notation leaves stray "V" spans on
+    # a page whose alphabet heading is "V") but not its size/boldness.
+    header_keys_by_page: dict[int, set[tuple[str, float, bool]]] = {}
     for h in subsections:
-        header_titles_by_page.setdefault(h.page_index, set()).add(h.title)
+        header_keys_by_page.setdefault(h.page_index, set()).add(
+            (h.title, h.font_size, h.is_bold)
+        )
 
     sections: list[RawSection] = []
     current: RawSection | None = None
@@ -45,7 +50,9 @@ def group_into_sections(
     for span in spans:
         if CHAPTER_PATTERN.match(span.text) or FIGURE_CAPTION_PATTERN.match(span.text):
             continue
-        is_header = span.text in header_titles_by_page.get(span.page_index, set())
+        is_header = (span.text, span.font_size, span.is_bold) in header_keys_by_page.get(
+            span.page_index, set()
+        )
         if is_header:
             chapter = _chapter_for_page(chapters, span.page_index)
             current = RawSection(
