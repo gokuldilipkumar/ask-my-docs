@@ -16,4 +16,7 @@ def rerank(query: str, candidates: list[tuple[str, str]], config: RerankConfig) 
     ids = [cid for cid, _ in candidates]
     if not config.enabled or not candidates:
         return ids[: config.top_k]
-    raise NotImplementedError
+    model = _get_model(config.model)
+    scores = model.predict([(query, text) for _, text in candidates])
+    ranked = sorted(zip(ids, scores, strict=True), key=lambda pair: pair[1], reverse=True)
+    return [cid for cid, _ in ranked[: config.top_k]]
