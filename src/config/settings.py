@@ -52,6 +52,9 @@ class EvalConfig(BaseModel):
     judge_model: str = "claude-haiku-4-5-20251001"  # verify against current Anthropic model list at build time
     judge_temperature: float = 0.0
     golden_path: str = "eval/golden/questions.yaml"
+    judge_max_tokens: int = 1024
+    judge_max_retries: int = 3
+    judge_timeout_seconds: float = 30.0
 
 
 class ObservabilityConfig(BaseModel):
