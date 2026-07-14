@@ -51,6 +51,7 @@ class CitationConfig(BaseModel):
 class EvalConfig(BaseModel):
     judge_model: str = "claude-haiku-4-5-20251001"  # verify against current Anthropic model list at build time
     judge_temperature: float = 0.0
+    golden_path: str = "eval/golden/questions.yaml"
 
 
 class ObservabilityConfig(BaseModel):

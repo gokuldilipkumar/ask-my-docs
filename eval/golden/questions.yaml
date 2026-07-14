@@ -1,0 +1,48 @@
+- id: q1_vmc_vso
+  question: "What's the difference between VMC and VSO?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q2_secondary_stall
+  question: "What is a secondary stall and how does it differ from an accelerated stall?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q3_shortfield_softfield
+  question: "How does a short-field takeoff differ from a soft-field takeoff?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q4_crosswind_errors
+  question: "What are the common errors during a crosswind takeoff?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q5_energy_rules
+  question: "Explain the three basic rules of energy control."
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q6_upset_recovery
+  question: "What should a pilot do during upset prevention and recovery training?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q7_wings_program
+  question: "What is the FAA Wings Program?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
+- id: q8_autorotation_oos
+  question: "Does this handbook cover helicopter autorotation procedures?"
+  relevant_chunk_ids: []
+  reference_notes: ""
+  auto_generated: false
+  reviewed: false
