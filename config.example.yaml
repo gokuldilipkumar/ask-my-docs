@@ -35,6 +35,7 @@ eval:
   judge_max_tokens: 1024
   judge_max_retries: 3
   judge_timeout_seconds: 30.0
+  cache_path: data/eval_cache.sqlite3
 
 observability:
   langfuse_enabled: true

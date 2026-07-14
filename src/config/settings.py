@@ -55,6 +55,7 @@ class EvalConfig(BaseModel):
     judge_max_tokens: int = 1024
     judge_max_retries: int = 3
     judge_timeout_seconds: float = 30.0
+    cache_path: str = "data/eval_cache.sqlite3"
 
 
 class ObservabilityConfig(BaseModel):
