@@ -58,6 +58,7 @@ class EvalConfig(BaseModel):
     cache_path: str = "data/eval_cache.sqlite3"
     baseline_dir: str = "eval/baselines"
     tolerance: float = 0.1
+    retrieval_k: int = 5
 
 
 class ObservabilityConfig(BaseModel):

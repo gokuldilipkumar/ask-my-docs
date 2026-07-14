@@ -38,6 +38,7 @@ eval:
   cache_path: data/eval_cache.sqlite3
   baseline_dir: eval/baselines
   tolerance: 0.1
+  retrieval_k: 5
 
 observability:
   langfuse_enabled: true
