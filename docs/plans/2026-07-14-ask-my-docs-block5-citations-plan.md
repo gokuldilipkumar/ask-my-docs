@@ -32,15 +32,15 @@
 
 **Success criteria**
 
-- [ ] `CitationVerdict`/`VerificationResult` (judge output) and `VerifiedAnswer` (public result: `answer_text`, `citations`, `coverage`, `low_confidence`) schemas exist.
-- [ ] Judge prompt is versioned (`prompts/verify_v1.md`, `PROMPT_VERSION` constant), instructs per-citation supported/unsupported judgment grounded only in the given excerpt.
-- [ ] Empty citations → `verify_citations` returns `coverage=1.0`, `low_confidence=False`, zero API calls (asserted via an exploding client).
-- [ ] Real judge call: batched structured output, SDK-native retry/timeout, thinking disabled — asserted via a fake client capturing `with_options`/`parse` kwargs.
-- [ ] Missing/unexpected chunk_ids in the verdict list default to unsupported — asserted via a fake client returning an incomplete verdict list.
-- [ ] Malformed/truncated judge output raises a clear `RuntimeError` naming `citations.max_tokens`, not a raw `pydantic.ValidationError`.
-- [ ] Live-judge test: one clearly-supported citation is kept, one clearly-unrelated citation is stripped and lowers `coverage` (probe-verified fixture).
-- [ ] `answer_with_verified_citations` orchestrator composes `answer_question` → `verify_citations`, fetching cited-subset text only when citations is non-empty.
-- [ ] Real-corpus spot-check: run the 8 design-doc sample questions end-to-end through the full verified pipeline; record `coverage`/`low_confidence` per question, confirm the honest non-answer (question 8) still yields `coverage=1.0` with zero judge calls, confirm at least one real case where an unsupported citation gets stripped (or note if none occurred and why).
+- [x] `CitationVerdict`/`VerificationResult` (judge output) and `VerifiedAnswer` (public result: `answer_text`, `citations`, `coverage`, `low_confidence`) schemas exist.
+- [x] Judge prompt is versioned (`prompts/verify_v1.md`, `PROMPT_VERSION` constant), instructs per-citation supported/unsupported judgment grounded only in the given excerpt.
+- [x] Empty citations → `verify_citations` returns `coverage=1.0`, `low_confidence=False`, zero API calls (asserted via an exploding client).
+- [x] Real judge call: batched structured output, SDK-native retry/timeout, thinking disabled — asserted via a fake client capturing `with_options`/`parse` kwargs.
+- [x] Missing/unexpected chunk_ids in the verdict list default to unsupported — asserted via a fake client returning an incomplete verdict list.
+- [x] Malformed/truncated judge output raises a clear `RuntimeError` naming `citations.max_tokens`, not a raw `pydantic.ValidationError`.
+- [x] Live-judge test: one clearly-supported citation is kept, one clearly-unrelated citation is stripped and lowers `coverage` (probe-verified fixture: `stall001`/`unrelated1`, verified against the real API in Chunk 5.3's pre-step probe and asserted in Chunk 5.4).
+- [x] `answer_with_verified_citations` orchestrator composes `answer_question` → `verify_citations`, fetching cited-subset text only when citations is non-empty.
+- [x] Real-corpus spot-check: ran all 8 design-doc sample questions end-to-end through the full verified pipeline (2026-07-14). All 8 landed at `coverage=1.0`, `low_confidence=False`. Question 8 (out-of-scope) yielded the honest non-answer with `citations=[]`, `coverage=1.0`, and confirmed zero judge calls (8.9s total vs. ~15-31s for questions with citations — no judge round-trip). **No unsupported citation was naturally stripped in this batch** — every citation Block 4's generation produced was judge-confirmed. Consistent with Block 4's own prompt fix ("citations must be empty unless the excerpt directly supports a claim") already doing most of the filtering upstream; the fail-safe stripping path itself was proven separately and directly by Chunk 5.4's live-API test (`unrelated1` stripped, coverage dropped to 0.5). Judge-call latency isolated on one query: `answer_question` 25.63s, cited-subset text re-fetch 0.01s (confirms Decision 3's "cheap" assumption), `verify_citations` 1.00s — the judge adds roughly 3-5% to total query latency, cheap relative to the daily-cost-cap budget. Notable secondary finding: question 3 (short-field vs. soft-field takeoff — Block 4's logged retrieval-surfacing gap) answered **both** halves of the comparison in this run, unlike Block 4's spot-check which surfaced only short-field content; logged as a retrieval-variance note for Block 6, not re-opened as fixed (single-run, non-deterministic retrieval/rerank/generation, no regression test exists either way).
 
 ---
 
