@@ -56,6 +56,8 @@ class EvalConfig(BaseModel):
     judge_max_retries: int = 3
     judge_timeout_seconds: float = 30.0
     cache_path: str = "data/eval_cache.sqlite3"
+    baseline_dir: str = "eval/baselines"
+    tolerance: float = 0.1
 
 
 class ObservabilityConfig(BaseModel):

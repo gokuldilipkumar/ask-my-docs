@@ -36,6 +36,8 @@ eval:
   judge_max_retries: 3
   judge_timeout_seconds: 30.0
   cache_path: data/eval_cache.sqlite3
+  baseline_dir: eval/baselines
+  tolerance: 0.1
 
 observability:
   langfuse_enabled: true
