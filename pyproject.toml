@@ -24,6 +24,7 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "--import-mode=importlib"
 markers = [
     "slow: local-model tests, skip with -m 'not slow' for the fast dev loop",
     "live_api: hits the real Anthropic API and costs money; skip by default, run with RUN_LIVE_API_TESTS=1",
