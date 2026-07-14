@@ -1,8 +1,9 @@
+import anthropic
 import pytest
 
 from citations.schema import CitationVerdict, VerificationResult, VerifiedAnswer
 from citations.verify import verify_citations
-from config.settings import CitationConfig
+from config.settings import CitationConfig, Settings
 from generate.schema import GeneratedAnswer
 
 
@@ -128,3 +129,29 @@ def test_verify_citations_raises_clear_error_on_truncated_output():
 
     with pytest.raises(RuntimeError, match="max_tokens"):
         verify_citations(FakeClient(), "q", answer, {"a": "text"}, config)
+
+
+@pytest.mark.slow
+@pytest.mark.live_api
+def test_verify_citations_keeps_supported_and_strips_unsupported_on_real_judge():
+    # Probe-verified 2026-07-14 against claude-haiku-4-5-20251001: verdicts=[
+    # CitationVerdict(chunk_id='stall001', supported=True),
+    # CitationVerdict(chunk_id='unrelated1', supported=False)] - exactly the
+    # discrimination this test asserts.
+    client = anthropic.Anthropic(api_key=Settings().anthropic_api_key)
+    config = CitationConfig()
+    answer = GeneratedAnswer(
+        answer_text="A stall occurs when the wing exceeds its critical angle of attack [stall001].",
+        citations=["stall001", "unrelated1"],
+    )
+    chunk_texts = {
+        "stall001": "A stall occurs when the wing exceeds its critical angle of attack, "
+        "causing a sudden loss of lift.",
+        "unrelated1": "The FAA Wings Program offers recurrent training credit.",
+    }
+
+    result = verify_citations(client, "What causes a stall?", answer, chunk_texts, config)
+
+    assert "stall001" in result.citations
+    assert "unrelated1" not in result.citations
+    assert result.coverage < 1.0
