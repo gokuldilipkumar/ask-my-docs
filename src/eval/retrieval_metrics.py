@@ -9,6 +9,8 @@ def recall_at_k(predicted_ids: list[str], relevant_ids: set[str], k: int) -> flo
 
 
 def mrr(predicted_ids: list[str], relevant_ids: set[str]) -> float:
+    if not relevant_ids:
+        return 1.0
     for rank, chunk_id in enumerate(predicted_ids, start=1):
         if chunk_id in relevant_ids:
             return 1.0 / rank
