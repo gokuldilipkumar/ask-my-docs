@@ -1,48 +1,161 @@
 - id: q1_vmc_vso
   question: "What's the difference between VMC and VSO?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 471132ed8f396c5f
+    - 3779fff3983138d3
+    - 5d263086dee93527
+    - 75d3bbed663a46de
+    - 5ff01ac6cd31cbb8
+    - 53fc48b9b3a0fe10
+    - 37098cd04d0ef4e4
+  reference_notes: >-
+    VMC (velocity, minimum control) is the minimum steady-flight airspeed at which a
+    multiengine airplane can be controlled with the critical engine suddenly made
+    inoperative and the remaining engine at takeoff power -- highly sensitive to bank
+    angle, established via a VMC demonstration. VSO is the stalling speed or minimum
+    steady flight speed in the landing configuration (power off, gear/flaps down).
+    Core difference: VMC is a directional-control limit tied to asymmetric thrust in
+    multiengine airplanes; VSO is an aerodynamic stall-speed limit that applies to any
+    airplane.
+  auto_generated: true
+  reviewed: true
 - id: q2_secondary_stall
   question: "What is a secondary stall and how does it differ from an accelerated stall?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 63338c69c2e8b8da
+    - eda036d66fce8863
+    - f4c00cdf44b0ae77
+    - 78306fff5d87c519
+    - 2fa2bad11254b534
+  reference_notes: >-
+    A secondary stall occurs after (during recovery from) a preceding stall, typically
+    caused by abrupt or premature back-elevator pressure before the airplane has
+    regained sufficient flying speed/AOA margin. An accelerated stall occurs at an
+    airspeed higher than the normal (1G) stall speed, caused by excessive load factor
+    (e.g., a steep turn or abrupt pull-up) increasing AOA beyond critical. Core
+    difference: secondary stall is a recovery-technique error following an initial
+    stall; accelerated stall is caused by load factor and does not require a preceding
+    stall.
+  auto_generated: true
+  reviewed: true
 - id: q3_shortfield_softfield
   question: "How does a short-field takeoff differ from a soft-field takeoff?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 998ef5a1db197626
+    - 0807c8097d3b012d
+    - 2051d8b0518afb6f
+    - 94d3f00f6dab01d0
+    - a623c469bffa6d6d
+    - b1f7f43634feacb8
+    - 27cfc142f56a3362
+    - 26b4f2d9703c0213
+    - 5dfe8ddd9d5dd56d
+  reference_notes: >-
+    Short-field takeoff: apply maximum available power before brake release (or as
+    rapidly as the engine accepts), hold/rotate at best angle-of-climb speed (Vx) to
+    clear an obstacle, minimize ground roll and distance to clear the obstacle.
+    Soft-field takeoff: minimize weight on the wheels via back-elevator pressure to
+    avoid bogging down in soft/loose surfaces (mud, sand, snow, tall grass), use ground
+    effect to accelerate close to the surface before climbing, keep the airplane moving
+    continuously without stopping on the surface. Core difference: short-field
+    optimizes for minimum distance/obstacle clearance on a firm surface; soft-field
+    optimizes for getting airborne without getting stuck on a soft surface.
+  auto_generated: true
+  reviewed: true
 - id: q4_crosswind_errors
   question: "What are the common errors during a crosswind takeoff?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 0c98a0e1acc1577a
+    - 9059079cef17d137
+    - d03a5efa77f5bc2d
+  reference_notes: >-
+    A correct/complete answer should describe crosswind takeoff correction technique:
+    apply aileron pressure into the wind throughout the takeoff roll (raises the
+    upwind aileron, counteracts the crosswind's lifting force on the upwind wing), and
+    maintain runway alignment via rudder as needed to prevent weathervaning. Note:
+    unlike most other maneuvers in this handbook, there is no explicit bulleted
+    "common errors in crosswind takeoffs" list in the corpus (verified: no such chunk
+    exists in a wide 25-candidate retrieval pool for this question, though every
+    similar maneuver -- normal takeoffs, stalls, spins, landings -- does have one) --
+    the closest available content is technique description, not an enumerated errors
+    list. A complete answer should draw on the technique and what goes wrong without
+    it, not claim a bulleted list exists that isn't there.
+  auto_generated: true
+  reviewed: true
 - id: q5_energy_rules
   question: "Explain the three basic rules of energy control."
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 331e1e3a5770fc53
+    - fb7d0ac65b8340a1
+    - 39486c7e66895a31
+  reference_notes: >-
+    Must state the three general energy control rules for coordinating throttle and
+    elevator (from the energy-control map, chapter 4): Rule #1 -- to move to a state
+    demanding MORE total energy, increase throttle (thrust > drag) and use elevator to
+    distribute the gain between altitude and airspeed (pitch up to climb at constant
+    speed, or gradually pitch down to accelerate at constant altitude). Rule #2 -- to
+    move to a state demanding LESS total energy, decrease throttle (thrust < drag) and
+    use elevator to distribute the loss (pitch down to descend at constant speed, or
+    gradually pitch up to slow down at constant altitude). Rule #3 -- to move to a
+    state demanding NO change in total energy, don't change throttle initially, and use
+    elevator to trade altitude for airspeed or vice versa (pitch up to trade speed for
+    altitude, pitch down to trade altitude for speed). Central principle: "pitch plus
+    power controls energy state."
+  auto_generated: true
+  reviewed: true
 - id: q6_upset_recovery
   question: "What should a pilot do during upset prevention and recovery training?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - ab8df00353e06b94
+    - fce68db208875b2e
+    - 87812ca07d60e424
+    - dbcd3013ece22e51
+    - 677f168a2b10099b
+    - 28bcaf0c76abc9fd
+    - 66923ae7e8afd8a2
+    - abb689d5eb590844
+    - 5cd5569f5aef2806
+    - 07f3174a38fa961b
+    - aa99343c1d0d6c25
+    - 6e4dc94ecc751cdb
+    - f6e0733894cf0127
+    - fcd44b0eff308cdf
+    - 4110ac96d7915420
+    - 95e6cf4813a8a5d5
+  reference_notes: >-
+    A complete answer should address several facets of upset prevention and recovery
+    training (UPRT): the academic/knowledge foundation (understanding what an upset is,
+    its time-critical nature, and common causes like spatial disorientation,
+    startle/surprise); maneuver-based/FSTD or aircraft-based practice to build correct,
+    prompt recovery responses; the proportional counter-response principle (timely,
+    correct control and thrust inputs matched to the specific upset); and awareness of
+    common recovery errors (misdiagnosing the upset type, failing to disconnect the
+    autopilot/wing leveler, failing to unload the airplane, rolling the wrong
+    direction, mismanaging airspeed during recovery). A correct but narrow answer
+    touching only one facet (e.g., only the academic portion) is incomplete.
+  auto_generated: true
+  reviewed: true
 - id: q7_wings_program
   question: "What is the FAA Wings Program?"
-  relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  relevant_chunk_ids:
+    - 8a3abce28a33f108
+  reference_notes: >-
+    Must state the FAA WINGS Program is a recurrent/continuous pilot proficiency
+    training program -- framed as ongoing practice and feedback (like professional
+    athletes or medical professionals maintaining proficiency) that can satisfy
+    recurrent training requirements, offered as an alternative pathway to the standard
+    14 CFR part 61 flight review requirement. Narrow lookup question -- answer should
+    be short and specific, not padded with unrelated content.
+  auto_generated: true
+  reviewed: true
 - id: q8_autorotation_oos
   question: "Does this handbook cover helicopter autorotation procedures?"
   relevant_chunk_ids: []
-  reference_notes: ""
-  auto_generated: false
-  reviewed: false
+  reference_notes: >-
+    Correct and complete answer is an honest statement that this handbook
+    (FAA-H-8083-3C, Airplane Flying Handbook) does not cover helicopter autorotation
+    procedures -- it is a fixed-wing/airplane handbook. Zero citations expected. A
+    fabricated "yes it does" answer is incorrect; a vague non-answer that doesn't
+    clearly say "no, out of scope" is incomplete.
+  auto_generated: true
+  reviewed: true

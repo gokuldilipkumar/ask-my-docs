@@ -35,4 +35,5 @@ def test_real_golden_file_has_the_eight_confirmed_sample_questions():
         "q7_wings_program",
         "q8_autorotation_oos",
     }
-    assert all(q.reviewed is False for q in questions)  # true until Chunk 6.3's manual review
+    assert all(q.reviewed is True for q in questions)  # reviewed by Chunk 6.3's manual pass
+    assert all(q.reference_notes for q in questions)
