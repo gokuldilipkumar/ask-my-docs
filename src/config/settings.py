@@ -41,6 +41,11 @@ class GenerationConfig(BaseModel):
 
 class CitationConfig(BaseModel):
     low_confidence_threshold: float = 0.7
+    judge_model: str = "claude-haiku-4-5-20251001"
+    judge_temperature: float = 0.0
+    max_tokens: int = 1024
+    max_retries: int = 3
+    timeout_seconds: float = 30.0
 
 
 class EvalConfig(BaseModel):

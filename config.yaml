@@ -26,6 +26,11 @@ generation:
 
 citations:
   low_confidence_threshold: 0.7
+  judge_model: claude-haiku-4-5-20251001
+  judge_temperature: 0.0
+  max_tokens: 1024
+  max_retries: 3
+  timeout_seconds: 30.0
 
 eval:
   judge_model: claude-haiku-4-5-20251001
