@@ -45,6 +45,7 @@ Use this workflow to execute a structured implementation plan step-by-step.
 7. **Technical Debt Discovery**
    - As you implement, actively look for existing technical debt, complex code that needs refactoring, or missing edge case handling.
    - If found, and it's out of scope for the current task, IMMEDIATELY add it to `BUGS.md` or the appropriate technical debt tracker.
+   - **Threshold Check**: Before writing a new instance of a pattern already flagged in `BUGS.md` with a "revisit if occurrence N appears" note (duplicated mock/fake scaffolding, a repeated config shape, etc.), check whether this new instance crosses that stated threshold. If it does, extract now instead of adding a fifth copy for a future audit to notice — Block 4 logged "revisit if a third fake-client test appears" and Block 6 shipped five more before anyone checked.
 
 8. **Progress Tracking**
    - Check off tasks in the plan file as they are completed.
