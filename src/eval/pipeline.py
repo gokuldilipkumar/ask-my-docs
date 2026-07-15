@@ -2,13 +2,14 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from citations.pipeline import answer_with_verified_citations
 from citations.prompt import PROMPT_VERSION as CITATIONS_PROMPT_VERSION
+from citations.verify import verify_citations
 from config.settings import Settings
 from eval.cache import config_hash, get_cached_result, save_cached_result
 from eval.judge import judge_answer
 from eval.retrieval_metrics import mrr, ndcg, recall_at_k
 from eval.schema import EvalResult, EvalRunResult, GoldenQuestion
+from generate.client import generate_answer
 from generate.prompt import PROMPT_VERSION as GENERATION_PROMPT_VERSION
 from ingest.vector_index import get_chunk_texts
 from rerank.cross_encoder import rerank
@@ -29,9 +30,12 @@ def _evaluate_one(
     reranked_ids = rerank(question.question, [(cid, texts[cid]) for cid in top_n_ids], settings.rerank)
     relevant = set(question.relevant_chunk_ids)
 
-    verified = answer_with_verified_citations(
-        question.question, client, bm25_dir, vector_db_path, settings
-    )
+    # Reuses the retrieve+rerank pass above for generation instead of calling
+    # answer_with_verified_citations (which would retrieve+rerank again internally) --
+    # rerank alone costs ~5.3s/query on the real corpus (BUGS.md), and this harness is
+    # what Block 8 wires into CI, so a second pass per question is not free.
+    answer = generate_answer(client, question.question, [(cid, texts[cid]) for cid in reranked_ids], settings.generation)
+    verified = verify_citations(client, question.question, answer, texts, settings.citations)
     judgment = judge_answer(
         client, question.question, verified.answer_text, question.reference_notes, settings.eval
     )
