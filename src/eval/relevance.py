@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from config.settings import EvalConfig
+from config.settings import EvalConfig, ObservabilityConfig
 from eval.llm_call import call_structured_judge
 
 _TEMPLATE_PATH = Path(__file__).parent.parent.parent / "prompts" / "relevance_v1.md"
@@ -18,11 +18,14 @@ class RelevanceLabelingResult(BaseModel):
 
 
 def label_relevance(
-    client, question: str, candidates: list[tuple[str, str]], config: EvalConfig
+    client, question: str, candidates: list[tuple[str, str]], config: EvalConfig,
+    observability_config: ObservabilityConfig | None = None,
 ) -> list[str]:
     context = "\n\n".join(f"[{chunk_id}] {text}" for chunk_id, text in candidates)
     prompt = _TEMPLATE_PATH.read_text().format(question=question, context=context)
-    result = call_structured_judge(client, prompt, RelevanceLabelingResult, config, "Relevance judge")
+    result = call_structured_judge(
+        client, prompt, RelevanceLabelingResult, config, "Relevance judge", observability_config=observability_config
+    )
 
     verdicts = {v.chunk_id: v.relevant for v in result.verdicts}
     return [chunk_id for chunk_id, _ in candidates if verdicts.get(chunk_id, False)]

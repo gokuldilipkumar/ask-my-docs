@@ -1,8 +1,9 @@
 import anthropic
 import pytest
 
-from config.settings import EvalConfig, Settings
+from config.settings import EvalConfig, ObservabilityConfig, Settings
 from eval.judge import AnswerJudgment, judge_answer
+from observability.daily_cost import get_daily_total
 
 
 def test_judge_answer_configures_client_and_returns_judgment(make_fake_structured_client):
@@ -19,6 +20,28 @@ def test_judge_answer_configures_client_and_returns_judgment(make_fake_structure
     assert client.parse_kwargs["output_format"] is AnswerJudgment
     assert result.correct is True
     assert result.complete is False
+
+
+def test_judge_answer_records_cost_when_observability_config_given(make_fake_structured_client, tmp_path):
+    judgment = AnswerJudgment(correct=True, complete=True, reasoning="x")
+    client = make_fake_structured_client(parsed_output=judgment)
+    obs_config = ObservabilityConfig(
+        cost_db_path=str(tmp_path / "daily_cost.sqlite3"),
+        price_table={"claude-haiku-4-5-20251001": {"input_per_million": 1.0, "output_per_million": 5.0}},
+    )
+
+    judge_answer(client, "q", "a", "notes", EvalConfig(), observability_config=obs_config)
+
+    assert get_daily_total(tmp_path / "daily_cost.sqlite3") > 0.0
+
+
+def test_judge_answer_defaults_to_no_cost_tracking_when_observability_config_omitted(make_fake_structured_client):
+    judgment = AnswerJudgment(correct=True, complete=True, reasoning="x")
+    client = make_fake_structured_client(parsed_output=judgment)
+
+    result = judge_answer(client, "q", "a", "notes", EvalConfig())  # unchanged existing call shape
+
+    assert result.correct is True
 
 
 def test_judge_answer_raises_clear_error_on_truncated_output(make_fake_structured_client):

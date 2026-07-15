@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 
@@ -28,6 +30,7 @@ class FakeStructuredClient:
             pass
 
         FakeResponse.parsed_output = parsed_output
+        FakeResponse.usage = SimpleNamespace(input_tokens=10, output_tokens=5)
         return FakeResponse()
 
 
