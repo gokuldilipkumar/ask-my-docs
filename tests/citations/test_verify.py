@@ -1,10 +1,13 @@
+from types import SimpleNamespace
+
 import anthropic
 import pytest
 
 from citations.schema import CitationVerdict, VerificationResult, VerifiedAnswer
 from citations.verify import verify_citations
-from config.settings import CitationConfig, Settings
+from config.settings import CitationConfig, ObservabilityConfig, Settings
 from generate.schema import GeneratedAnswer
+from observability.context import ObservabilityContext
 
 
 def test_no_citations_returns_full_coverage_without_calling_client():
@@ -40,6 +43,7 @@ def test_verify_citations_configures_client_and_strips_unsupported():
 
             class FakeResponse:
                 parsed_output = verdicts
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
 
             return FakeResponse()
 
@@ -93,6 +97,7 @@ def test_verify_citations_treats_missing_verdict_as_unsupported():
         def parse(self, **kwargs):
             class FakeResponse:
                 parsed_output = verdicts
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
 
             return FakeResponse()
 
@@ -110,6 +115,54 @@ def test_verify_citations_treats_missing_verdict_as_unsupported():
 
     assert result.citations == ["abc123"]
     assert result.coverage == 0.5
+
+
+def test_verify_citations_opens_a_generation_span_and_reports_usage():
+    verdicts = VerificationResult(verdicts=[CitationVerdict(chunk_id="abc123", supported=True)])
+
+    class FakeMessages:
+        def parse(self, **kwargs):
+            class FakeResponse:
+                parsed_output = verdicts
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    class SpyTracer:
+        def __init__(self):
+            self.spans = []
+
+        def span(self, name, *, as_type="span", model=None):
+            self.spans.append({"name": name, "as_type": as_type, "model": model})
+            return _SpySpanCtx()
+
+    class _SpySpanCtx:
+        def __enter__(self):
+            return self
+
+        def update(self, **kwargs):
+            pass
+
+        def __exit__(self, *exc):
+            return False
+
+    answer = GeneratedAnswer(answer_text="...[abc123]", citations=["abc123"])
+    config = CitationConfig(judge_model="claude-haiku-4-5-20251001")
+    tracer = SpyTracer()
+    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig(price_table={}))
+
+    verify_citations(FakeClient(), "q", answer, {"abc123": "text"}, config, observability=observability)
+
+    assert tracer.spans == [
+        {"name": "citations.verify", "as_type": "generation", "model": "claude-haiku-4-5-20251001"}
+    ]
 
 
 def test_verify_citations_raises_clear_error_on_truncated_output():

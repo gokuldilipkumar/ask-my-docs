@@ -1,9 +1,12 @@
+from types import SimpleNamespace
+
 import anthropic
 import pytest
 
-from config.settings import GenerationConfig, Settings
+from config.settings import GenerationConfig, ObservabilityConfig, Settings
 from generate.client import generate_answer
 from generate.schema import GeneratedAnswer
+from observability.context import ObservabilityContext
 
 
 def test_empty_chunks_returns_canned_answer_without_calling_client():
@@ -32,6 +35,7 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
 
             class FakeResponse:
                 parsed_output = canned
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
 
             return FakeResponse()
 
@@ -59,6 +63,81 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
     assert parse_kwargs["max_tokens"] == 999
     assert parse_kwargs["thinking"] == {"type": "disabled"}
     assert parse_kwargs["output_format"] is GeneratedAnswer
+    assert result is canned
+
+
+def test_generate_answer_opens_a_generation_span_and_reports_usage():
+    canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
+
+    class FakeMessages:
+        def parse(self, **kwargs):
+            class FakeResponse:
+                parsed_output = canned
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    class SpyTracer:
+        def __init__(self):
+            self.spans = []
+
+        def span(self, name, *, as_type="span", model=None):
+            self.spans.append({"name": name, "as_type": as_type, "model": model})
+            return _SpySpanCtx(self)
+
+    class _SpySpanCtx:
+        def __init__(self, tracer):
+            self.tracer = tracer
+            self.update_calls = []
+
+        def __enter__(self):
+            return self
+
+        def update(self, **kwargs):
+            self.update_calls.append(kwargs)
+
+        def __exit__(self, *exc):
+            return False
+
+    config = GenerationConfig(model="claude-sonnet-5")
+    tracer = SpyTracer()
+    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig(price_table={}))
+
+    generate_answer(FakeClient(), "q", [("abc123", "text")], config, observability=observability)
+
+    assert tracer.spans == [{"name": "generate.answer", "as_type": "generation", "model": "claude-sonnet-5"}]
+
+
+def test_generate_answer_defaults_to_noop_tracer_when_observability_omitted():
+    canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
+
+    class FakeMessages:
+        def parse(self, **kwargs):
+            class FakeResponse:
+                parsed_output = canned
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    config = GenerationConfig()
+
+    # No observability argument at all -- unchanged existing call shape must keep working.
+    result = generate_answer(FakeClient(), "q", [("abc123", "text")], config)
+
     assert result is canned
 
 
