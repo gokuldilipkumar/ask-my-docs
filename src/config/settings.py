@@ -64,6 +64,13 @@ class EvalConfig(BaseModel):
 class ObservabilityConfig(BaseModel):
     langfuse_enabled: bool = True
     daily_cost_cap_usd: float = 5.0
+    cost_db_path: str = "data/daily_cost.sqlite3"
+    price_table: dict[str, dict[str, float]] = {
+        # Placeholder figures -- verify against Anthropic's current published pricing
+        # before trusting real cost capture.
+        "claude-sonnet-5": {"input_per_million": 3.0, "output_per_million": 15.0},
+        "claude-haiku-4-5-20251001": {"input_per_million": 1.0, "output_per_million": 5.0},
+    }
 
 
 class Settings(BaseSettings):
