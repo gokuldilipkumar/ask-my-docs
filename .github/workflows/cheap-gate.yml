@@ -1,0 +1,22 @@
+name: cheap-gate
+
+on: [push, pull_request]
+
+jobs:
+  test-and-retrieval-eval:
+    runs-on: ubuntu-latest
+    env:
+      # Settings.anthropic_api_key has no default and is required to construct
+      # Settings() at all, even though nothing in this job makes a real API call
+      # (fast unit tests use fakes; `eval --retrieval-only` never touches Anthropic).
+      # A real key is deliberately NOT needed here -- see nightly-eval.yml for that.
+      ANTHROPIC_API_KEY: ci-placeholder-unused
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: uv run pytest -m "not slow and not live_api" -q
+      - run: uv run pytest -m "slow and not live_api" -q  # exercises real local models (embedding, cross-encoder), still zero API cost
+      - name: Retrieval-only eval gate
+        run: uv run python -m app.main eval --index data/index --retrieval-only
