@@ -5,6 +5,10 @@ import typer
 
 from citations.pipeline import answer_with_verified_citations
 from config import get_settings
+from eval.baseline import compare_to_baseline, load_latest_baseline
+from eval.baseline import save_baseline as save_baseline_run  # avoid shadowing the --save-baseline flag name
+from eval.pipeline import run_eval
+from eval.schema import load_golden_questions
 from ingest.bm25_index import build_bm25_index
 from ingest.chunker import chunk_pdf
 from ingest.vector_index import build_vector_index
@@ -55,6 +59,47 @@ def query(
 
     total_cost = get_daily_total(Path(settings.observability.cost_db_path))
     typer.echo(f"Daily cost so far: ${total_cost:.4f}")
+
+
+@app.command(name="eval")
+def eval_command(
+    index: Path = typer.Option(Path("data/index")),
+    retrieval_only: bool = typer.Option(False, "--retrieval-only"),
+    save_baseline: bool = typer.Option(False, "--save-baseline"),
+) -> None:
+    settings = get_settings()
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    questions = load_golden_questions(Path(settings.eval.golden_path))
+
+    result = run_eval(
+        questions, client, index / "bm25", index / "lancedb", settings, retrieval_only=retrieval_only
+    )
+
+    exit_code = 0
+    baseline = load_latest_baseline(Path(settings.eval.baseline_dir))
+    if baseline is None:
+        typer.echo("No baseline found -- nothing to compare against.")
+    else:
+        comparison = compare_to_baseline(result, baseline, settings.eval.tolerance)
+        for metric, passed in comparison.items():
+            status = "PASS" if passed else "FAIL"
+            current_value = getattr(result, metric)
+            baseline_value = getattr(baseline, metric)
+            typer.echo(f"{metric}: {status} (current={current_value:.3f}, baseline={baseline_value:.3f})")
+        if not all(comparison.values()):
+            exit_code = 1
+
+    if save_baseline:
+        if retrieval_only:
+            typer.echo("Skipping baseline save: --retrieval-only runs must not become the tracked baseline.")
+        else:
+            path = save_baseline_run(result, Path(settings.eval.baseline_dir))
+            typer.echo(f"Saved baseline: {path}")
+
+    total_cost = get_daily_total(Path(settings.observability.cost_db_path))
+    typer.echo(f"Daily cost so far: ${total_cost:.4f}")
+
+    raise typer.Exit(code=exit_code)
 
 
 if __name__ == "__main__":
