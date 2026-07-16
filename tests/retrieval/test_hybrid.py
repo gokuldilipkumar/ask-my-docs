@@ -55,7 +55,7 @@ def test_changing_fusion_weights_changes_top_result(tmp_path, make_chunk):
 
 
 @pytest.mark.slow
-def test_hybrid_retrieve_opens_spans_for_bm25_vector_and_fusion(tmp_path, make_chunk):
+def test_hybrid_retrieve_opens_spans_for_bm25_vector_and_fusion(tmp_path, make_chunk, spy_tracer):
     chunks = [
         make_chunk("a", "The stall occurs when the critical angle of attack is exceeded."),
         make_chunk("b", "Weight and balance must be computed before every flight."),
@@ -65,28 +65,11 @@ def test_hybrid_retrieve_opens_spans_for_bm25_vector_and_fusion(tmp_path, make_c
     build_bm25_index(chunks, bm25_dir)
     build_vector_index(chunks, vector_dir)
 
-    class SpyTracer:
-        def __init__(self):
-            self.spans = []
-
-        def span(self, name, *, as_type="span", model=None):
-            self.spans.append(name)
-            return _SpySpanCtx()
-
-    class _SpySpanCtx:
-        def __enter__(self):
-            return self
-
-        def update(self, **kwargs):
-            pass
-
-        def __exit__(self, *exc):
-            return False
-
     config = RetrievalConfig(rrf_k=60, bm25_weight=1.0, vector_weight=1.0, top_n=2)
-    tracer = SpyTracer()
-    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig())
+    observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig())
 
     hybrid_retrieve(bm25_dir, vector_dir, "What causes a stall?", config, observability=observability)
 
-    assert tracer.spans == ["retrieval.bm25.search", "retrieval.vector.search", "retrieval.fusion.rrf"]
+    assert [s["name"] for s in spy_tracer.spans] == [
+        "retrieval.bm25.search", "retrieval.vector.search", "retrieval.fusion.rrf"
+    ]

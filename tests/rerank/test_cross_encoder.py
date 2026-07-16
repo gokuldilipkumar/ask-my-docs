@@ -65,70 +65,32 @@ def test_rerank_puts_semantically_relevant_candidate_first():
     assert result[0] == "rel"
 
 
-def test_rerank_opens_one_span_when_scoring(monkeypatch):
+def test_rerank_opens_one_span_when_scoring(monkeypatch, spy_tracer):
     class FakeModel:
         def predict(self, pairs):
             return [0.0] * len(pairs)
 
     monkeypatch.setattr(cross_encoder, "_get_model", lambda name: FakeModel())
 
-    class SpyTracer:
-        def __init__(self):
-            self.spans = []
-
-        def span(self, name, *, as_type="span", model=None):
-            self.spans.append(name)
-            return _SpySpanCtx()
-
-    class _SpySpanCtx:
-        def __enter__(self):
-            return self
-
-        def update(self, **kwargs):
-            pass
-
-        def __exit__(self, *exc):
-            return False
-
-    tracer = SpyTracer()
-    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig())
+    observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig())
     config = RerankConfig(enabled=True, top_k=1)
 
     rerank("q", [("a", "text")], config, observability=observability)
 
-    assert tracer.spans == ["rerank.score"]
+    assert [s["name"] for s in spy_tracer.spans] == ["rerank.score"]
 
 
-def test_disabled_rerank_opens_no_span(monkeypatch):
+def test_disabled_rerank_opens_no_span(monkeypatch, spy_tracer):
     monkeypatch.setattr(
         cross_encoder, "_get_model", lambda name: pytest.fail("passthrough must not load the model")
     )
 
-    class SpyTracer:
-        def __init__(self):
-            self.spans = []
-
-        def span(self, name, *, as_type="span", model=None):
-            self.spans.append(name)
-            return _SpySpanCtx()
-
-    class _SpySpanCtx:
-        def __enter__(self):
-            return self
-
-        def update(self, **kwargs):
-            pass
-
-        def __exit__(self, *exc):
-            return False
-
-    tracer = SpyTracer()
-    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig())
+    observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig())
     config = RerankConfig(enabled=False, top_k=2)
 
     rerank("q", [("a", "text")], config, observability=observability)
 
-    assert tracer.spans == []
+    assert spy_tracer.spans == []
 
 
 def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len(monkeypatch):

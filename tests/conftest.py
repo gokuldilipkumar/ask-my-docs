@@ -35,6 +35,39 @@ def make_chunk():
 
 
 @pytest.fixture
+def spy_tracer():
+    """A Tracer that records every span opened (name/as_type/model) and every
+    .update(**kwargs) call made on it, for asserting on tracing/cost-reporting wiring
+    without a real Langfuse client."""
+
+    class _SpySpanCtx:
+        def __init__(self):
+            self.update_calls = []
+
+        def __enter__(self):
+            return self
+
+        def update(self, **kwargs):
+            self.update_calls.append(kwargs)
+
+        def __exit__(self, *exc):
+            return False
+
+    class SpyTracer:
+        def __init__(self):
+            self.spans = []
+            self.span_ctxs = []
+
+        def span(self, name, *, as_type="span", model=None):
+            self.spans.append({"name": name, "as_type": as_type, "model": model})
+            ctx = _SpySpanCtx()
+            self.span_ctxs.append(ctx)
+            return ctx
+
+    return SpyTracer()
+
+
+@pytest.fixture
 def make_pdf(tmp_path):
     def _make_pdf(pages: list[list[tuple | list[tuple]]]) -> Path:
         """pages: list of pages; each page is a list of rows.
