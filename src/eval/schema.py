@@ -18,25 +18,27 @@ class EvalResult(BaseModel):
     recall_at_k: float
     mrr: float
     ndcg: float
-    coverage: float
-    low_confidence: bool
-    correct: bool
-    complete: bool
+    # None in retrieval_only mode -- distinct from "computed and failed", not a sentinel.
+    coverage: float | None = None
+    low_confidence: bool | None = None
+    correct: bool | None = None
+    complete: bool | None = None
 
 
 class EvalRunResult(BaseModel):
     git_commit_sha: str
-    generation_prompt_version: str
-    citations_prompt_version: str
+    generation_prompt_version: str | None = None
+    citations_prompt_version: str | None = None
     timestamp: str
+    retrieval_only: bool = False
     results: list[EvalResult]
     mean_recall_at_k: float
     mean_mrr: float
     mean_ndcg: float
-    mean_coverage: float
-    low_confidence_rate: float
-    correctness_rate: float
-    completeness_rate: float
+    mean_coverage: float | None = None
+    low_confidence_rate: float | None = None
+    correctness_rate: float | None = None
+    completeness_rate: float | None = None
 
 
 def load_golden_questions(path: Path) -> list[GoldenQuestion]:

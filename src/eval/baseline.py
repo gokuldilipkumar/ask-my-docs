@@ -29,7 +29,10 @@ def load_latest_baseline(baseline_dir: Path) -> EvalRunResult | None:
 def compare_to_baseline(
     current: EvalRunResult, baseline: EvalRunResult, tolerance: float
 ) -> dict[str, bool]:
+    # A field missing on either side (retrieval_only leaves answer-quality fields
+    # None) has nothing to compare -- skipped, not treated as a pass or a fail.
     return {
         field: getattr(current, field) >= getattr(baseline, field) - tolerance
         for field in _METRIC_FIELDS
+        if getattr(current, field) is not None and getattr(baseline, field) is not None
     }

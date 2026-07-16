@@ -26,7 +26,7 @@ def _git_commit_sha() -> str:
 
 def _evaluate_one(
     question: GoldenQuestion, client, bm25_dir: Path, vector_db_path: Path, settings: Settings,
-    observability: ObservabilityContext,
+    observability: ObservabilityContext, retrieval_only: bool = False,
 ) -> EvalResult:
     top_n_ids = hybrid_retrieve(
         bm25_dir, vector_db_path, question.question, settings.retrieval, observability=observability
@@ -36,6 +36,15 @@ def _evaluate_one(
         question.question, [(cid, texts[cid]) for cid in top_n_ids], settings.rerank, observability=observability
     )
     relevant = set(question.relevant_chunk_ids)
+
+    retrieval_metrics = dict(
+        question_id=question.id,
+        recall_at_k=recall_at_k(reranked_ids, relevant, settings.eval.retrieval_k),
+        mrr=mrr(reranked_ids, relevant),
+        ndcg=ndcg(reranked_ids, relevant, settings.eval.retrieval_k),
+    )
+    if retrieval_only:
+        return EvalResult(**retrieval_metrics)
 
     # Reuses the retrieve+rerank pass above for generation instead of calling
     # answer_with_verified_citations (which would retrieve+rerank again internally) --
@@ -54,10 +63,7 @@ def _evaluate_one(
     )
 
     return EvalResult(
-        question_id=question.id,
-        recall_at_k=recall_at_k(reranked_ids, relevant, settings.eval.retrieval_k),
-        mrr=mrr(reranked_ids, relevant),
-        ndcg=ndcg(reranked_ids, relevant, settings.eval.retrieval_k),
+        **retrieval_metrics,
         coverage=verified.coverage,
         low_confidence=verified.low_confidence,
         correct=judgment.correct,
@@ -66,7 +72,8 @@ def _evaluate_one(
 
 
 def run_eval(
-    golden_questions: list[GoldenQuestion], client, bm25_dir: Path, vector_db_path: Path, settings: Settings
+    golden_questions: list[GoldenQuestion], client, bm25_dir: Path, vector_db_path: Path, settings: Settings,
+    retrieval_only: bool = False,
 ) -> EvalRunResult:
     cache_path = Path(settings.eval.cache_path)
     cfg_hash = config_hash(settings)
@@ -75,6 +82,13 @@ def run_eval(
 
     for question in golden_questions:
         if not question.reviewed:
+            continue
+        # The cache exists to avoid re-spending on paid API calls (design doc) --
+        # retrieval_only makes none, so caching it would only add the risk of a
+        # full-run cache entry being misread by a retrieval_only reader (or vice
+        # versa) with no mode component in the key to catch the mismatch.
+        if retrieval_only:
+            results.append(_evaluate_one(question, client, bm25_dir, vector_db_path, settings, observability, True))
             continue
         cached = get_cached_result(cache_path, question.id, cfg_hash)
         if cached is not None:
@@ -85,17 +99,22 @@ def run_eval(
         results.append(result)
 
     n = len(results) or 1
+
+    def _mean_or_none(attr: str) -> float | None:
+        return None if retrieval_only else sum(getattr(r, attr) for r in results) / n
+
     return EvalRunResult(
         git_commit_sha=_git_commit_sha(),
-        generation_prompt_version=GENERATION_PROMPT_VERSION,
-        citations_prompt_version=CITATIONS_PROMPT_VERSION,
+        generation_prompt_version=None if retrieval_only else GENERATION_PROMPT_VERSION,
+        citations_prompt_version=None if retrieval_only else CITATIONS_PROMPT_VERSION,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        retrieval_only=retrieval_only,
         results=results,
         mean_recall_at_k=sum(r.recall_at_k for r in results) / n,
         mean_mrr=sum(r.mrr for r in results) / n,
         mean_ndcg=sum(r.ndcg for r in results) / n,
-        mean_coverage=sum(r.coverage for r in results) / n,
-        low_confidence_rate=sum(r.low_confidence for r in results) / n,
-        correctness_rate=sum(r.correct for r in results) / n,
-        completeness_rate=sum(r.complete for r in results) / n,
+        mean_coverage=_mean_or_none("coverage"),
+        low_confidence_rate=_mean_or_none("low_confidence"),
+        correctness_rate=_mean_or_none("correct"),
+        completeness_rate=_mean_or_none("complete"),
     )

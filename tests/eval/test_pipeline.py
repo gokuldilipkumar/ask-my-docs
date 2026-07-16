@@ -51,10 +51,11 @@ def _patch_pipeline(monkeypatch, call_counts, answered):
         return FakeJudgment()
 
     def fake_get_cached_result(cache_path, question_id, cfg_hash):
+        call_counts["cache_get"] = call_counts.get("cache_get", 0) + 1
         return None
 
     def fake_save_cached_result(cache_path, question_id, cfg_hash, result):
-        pass
+        call_counts["cache_save"] = call_counts.get("cache_save", 0) + 1
 
     monkeypatch.setattr(pipeline, "hybrid_retrieve", fake_hybrid_retrieve)
     monkeypatch.setattr(pipeline, "rerank", fake_rerank)
@@ -152,3 +153,53 @@ def test_run_eval_passes_a_cost_tracking_observability_context_to_generation_and
         observability = call_counts[key]
         assert observability is not None
         assert observability.config is settings.observability
+
+
+def test_run_eval_retrieval_only_skips_generation_and_the_cache(monkeypatch):
+    question = GoldenQuestion(
+        id="q1", question="q", relevant_chunk_ids=["a"], reference_notes="notes", reviewed=True
+    )
+    call_counts, answered = {}, []
+    _patch_pipeline(monkeypatch, call_counts, answered)
+
+    settings = Settings(anthropic_api_key="placeholder")
+
+    result = run_eval(
+        [question], client=object(), bm25_dir=Path("unused"),
+        vector_db_path=Path("unused"), settings=settings, retrieval_only=True,
+    )
+
+    assert answered == []  # generate_answer never called
+    assert "judge_observability_config" not in call_counts  # judge_answer never called
+    assert "cache_get" not in call_counts  # cache never touched in retrieval_only mode
+    assert "cache_save" not in call_counts
+    assert result.retrieval_only is True
+    assert result.results[0].correct is None
+    assert result.results[0].coverage is None
+    assert result.correctness_rate is None
+    assert result.completeness_rate is None
+    assert result.mean_coverage is None
+    assert result.low_confidence_rate is None
+    assert result.generation_prompt_version is None
+    assert result.citations_prompt_version is None
+    assert result.mean_recall_at_k == 1.0  # retrieval metrics still computed
+    assert result.mean_mrr == 1.0
+    assert result.mean_ndcg == 1.0
+
+
+def test_run_eval_full_mode_still_uses_the_cache(monkeypatch):
+    question = GoldenQuestion(
+        id="q1", question="q", relevant_chunk_ids=["a"], reference_notes="notes", reviewed=True
+    )
+    call_counts, answered = {}, []
+    _patch_pipeline(monkeypatch, call_counts, answered)
+
+    settings = Settings(anthropic_api_key="placeholder")
+
+    run_eval(
+        [question], client=object(), bm25_dir=Path("unused"),
+        vector_db_path=Path("unused"), settings=settings,
+    )
+
+    assert call_counts["cache_get"] == 1
+    assert call_counts["cache_save"] == 1

@@ -40,3 +40,18 @@ def test_compare_to_baseline_fails_beyond_tolerance():
     comparison = compare_to_baseline(current, baseline, tolerance=0.1)
 
     assert comparison["correctness_rate"] is False  # 0.5 < 0.9 - 0.1
+
+
+def test_compare_to_baseline_skips_fields_none_on_either_side():
+    current = EvalRunResult(
+        git_commit_sha="cur", generation_prompt_version=None, citations_prompt_version=None,
+        timestamp="t", retrieval_only=True, results=[],
+        mean_recall_at_k=0.9, mean_mrr=0.9, mean_ndcg=0.9,
+        mean_coverage=None, low_confidence_rate=None, correctness_rate=None, completeness_rate=None,
+    )
+    baseline = _run_result(0.9)  # a full run -- has real values for every field
+
+    comparison = compare_to_baseline(current, baseline, tolerance=0.1)
+
+    assert set(comparison) == {"mean_recall_at_k", "mean_mrr", "mean_ndcg"}
+    assert all(comparison.values())
