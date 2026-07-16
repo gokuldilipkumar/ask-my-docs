@@ -1,10 +1,12 @@
 # Source corpus (large, publicly downloadable — document the download step instead of committing it)
 *.pdf
 
-# Ingestion artifacts (regenerable)
-data/
+# Ingestion artifacts (regenerable from the PDF) except the built index,
+# which CI needs and is small enough (~2-7MB) to commit directly.
+data/*
+!data/index/
+!data/index/**
 *.index
-*.lance/
 
 # Python
 __pycache__/
