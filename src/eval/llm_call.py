@@ -6,6 +6,9 @@ from observability.usage import report_usage
 
 def call_structured_judge(
     client, prompt: str, output_format: type[BaseModel], config: EvalConfig, error_label: str,
+    # Config only, not a full ObservabilityContext: eval judges are deliberately cost-tracked
+    # but never traced (no tracer.span here) -- they run in the offline eval flow, not the
+    # traced query-time path the design doc diagrams (bm25/vector/fusion/rerank/generate/verify).
     observability_config: ObservabilityConfig | None = None,
 ) -> BaseModel:
     scoped_client = client.with_options(max_retries=config.judge_max_retries, timeout=config.judge_timeout_seconds)

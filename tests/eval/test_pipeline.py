@@ -7,19 +7,22 @@ from eval.schema import GoldenQuestion
 
 
 def _patch_pipeline(monkeypatch, call_counts, answered):
-    def fake_hybrid_retrieve(bm25_dir, vector_db_path, question, config):
+    def fake_hybrid_retrieve(bm25_dir, vector_db_path, question, config, observability=None):
         call_counts["retrieve"] = call_counts.get("retrieve", 0) + 1
+        call_counts["retrieve_observability"] = observability
         return ["a"]
 
-    def fake_rerank(question, candidates, config):
+    def fake_rerank(question, candidates, config, observability=None):
         call_counts["rerank"] = call_counts.get("rerank", 0) + 1
+        call_counts["rerank_observability"] = observability
         return [cid for cid, _ in candidates]
 
     def fake_get_chunk_texts(vector_db_path, ids):
         return {cid: "text" for cid in ids}
 
-    def fake_generate_answer(client, question, chunks, config):
+    def fake_generate_answer(client, question, chunks, config, observability=None):
         answered.append(question)
+        call_counts["generate_observability"] = observability
 
         class FakeAnswer:
             answer_text = "answer"
@@ -27,7 +30,9 @@ def _patch_pipeline(monkeypatch, call_counts, answered):
 
         return FakeAnswer()
 
-    def fake_verify_citations(client, question, answer, chunk_texts, config):
+    def fake_verify_citations(client, question, answer, chunk_texts, config, observability=None):
+        call_counts["verify_observability"] = observability
+
         class FakeVerified:
             answer_text = answer.answer_text
             citations = answer.citations
@@ -36,7 +41,9 @@ def _patch_pipeline(monkeypatch, call_counts, answered):
 
         return FakeVerified()
 
-    def fake_judge_answer(client, question, answer_text, reference_notes, config):
+    def fake_judge_answer(client, question, answer_text, reference_notes, config, observability_config=None):
+        call_counts["judge_observability_config"] = observability_config
+
         class FakeJudgment:
             correct = True
             complete = True
@@ -98,4 +105,50 @@ def test_run_eval_retrieves_and_reranks_only_once_per_question(monkeypatch):
     # Retrieval metrics and answer generation must share one retrieve+rerank pass --
     # rerank alone measures ~5.3s/query on the real corpus (BUGS.md), so a second
     # pass per question would double this harness's cost for no correctness gain.
-    assert call_counts == {"retrieve": 1, "rerank": 1}
+    assert call_counts["retrieve"] == 1
+    assert call_counts["rerank"] == 1
+
+
+def test_run_eval_passes_observability_config_to_judge_answer(monkeypatch):
+    question = GoldenQuestion(
+        id="q1", question="q", relevant_chunk_ids=["a"], reference_notes="notes", reviewed=True
+    )
+    call_counts, answered = {}, []
+    _patch_pipeline(monkeypatch, call_counts, answered)
+
+    settings = Settings(anthropic_api_key="placeholder")
+
+    run_eval(
+        [question], client=object(), bm25_dir=Path("unused"),
+        vector_db_path=Path("unused"), settings=settings,
+    )
+
+    # judge_answer spends real money on every eval run -- it must be given the real
+    # ObservabilityConfig so its cost lands in the daily running total, not silently
+    # dropped because the caller forgot to pass it through.
+    assert call_counts["judge_observability_config"] is settings.observability
+
+
+def test_run_eval_passes_a_cost_tracking_observability_context_to_generation_and_verification(monkeypatch):
+    question = GoldenQuestion(
+        id="q1", question="q", relevant_chunk_ids=["a"], reference_notes="notes", reviewed=True
+    )
+    call_counts, answered = {}, []
+    _patch_pipeline(monkeypatch, call_counts, answered)
+
+    settings = Settings(anthropic_api_key="placeholder")
+
+    run_eval(
+        [question], client=object(), bm25_dir=Path("unused"),
+        vector_db_path=Path("unused"), settings=settings,
+    )
+
+    # generate_answer and verify_citations both hit the real Anthropic API during an
+    # eval run -- omitting observability here (as this pipeline did before this fix)
+    # meant their real cost silently never counted against daily_cost_cap_usd, even
+    # though judge_answer's cost was tracked. Both must receive a context carrying
+    # the real ObservabilityConfig so report_usage actually fires.
+    for key in ("generate_observability", "verify_observability"):
+        observability = call_counts[key]
+        assert observability is not None
+        assert observability.config is settings.observability

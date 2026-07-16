@@ -8,6 +8,8 @@ from citations.verify import verify_citations
 from config.settings import CitationConfig, ObservabilityConfig, Settings
 from generate.schema import GeneratedAnswer
 from observability.context import ObservabilityContext
+from observability.daily_cost import get_daily_total
+from observability.tracer import NoOpTracer
 
 
 def test_no_citations_returns_full_coverage_without_calling_client():
@@ -117,7 +119,7 @@ def test_verify_citations_treats_missing_verdict_as_unsupported():
     assert result.coverage == 0.5
 
 
-def test_verify_citations_opens_a_generation_span_and_reports_usage():
+def test_verify_citations_opens_a_generation_span_and_reports_usage(spy_tracer):
     verdicts = VerificationResult(verdicts=[CitationVerdict(chunk_id="abc123", supported=True)])
 
     class FakeMessages:
@@ -135,34 +137,54 @@ def test_verify_citations_opens_a_generation_span_and_reports_usage():
         def with_options(self, **kwargs):
             return FakeScopedClient()
 
-    class SpyTracer:
-        def __init__(self):
-            self.spans = []
-
-        def span(self, name, *, as_type="span", model=None):
-            self.spans.append({"name": name, "as_type": as_type, "model": model})
-            return _SpySpanCtx()
-
-    class _SpySpanCtx:
-        def __enter__(self):
-            return self
-
-        def update(self, **kwargs):
-            pass
-
-        def __exit__(self, *exc):
-            return False
-
     answer = GeneratedAnswer(answer_text="...[abc123]", citations=["abc123"])
     config = CitationConfig(judge_model="claude-haiku-4-5-20251001")
-    tracer = SpyTracer()
-    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig(price_table={}))
+    price_table = {"claude-haiku-4-5-20251001": {"input_per_million": 1.0, "output_per_million": 5.0}}
+    observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig(price_table=price_table))
 
     verify_citations(FakeClient(), "q", answer, {"abc123": "text"}, config, observability=observability)
 
-    assert tracer.spans == [
+    assert spy_tracer.spans == [
         {"name": "citations.verify", "as_type": "generation", "model": "claude-haiku-4-5-20251001"}
     ]
+    # cost = (10 input tokens * $1/Mtok + 5 output tokens * $5/Mtok) / 1_000_000 = $0.000035
+    assert spy_tracer.span_ctxs[0].update_calls == [
+        {"usage_details": {"input": 10, "output": 5}, "cost_details": {"total": 0.000035}}
+    ]
+
+
+def test_verify_citations_records_cost_when_observability_given(tmp_path):
+    verdicts = VerificationResult(verdicts=[CitationVerdict(chunk_id="abc123", supported=True)])
+
+    class FakeMessages:
+        def parse(self, **kwargs):
+            class FakeResponse:
+                parsed_output = verdicts
+                usage = SimpleNamespace(input_tokens=1_000_000, output_tokens=0)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    answer = GeneratedAnswer(answer_text="...[abc123]", citations=["abc123"])
+    config = CitationConfig(judge_model="claude-haiku-4-5-20251001")
+    obs_config = ObservabilityConfig(
+        cost_db_path=str(tmp_path / "daily_cost.sqlite3"),
+        price_table={"claude-haiku-4-5-20251001": {"input_per_million": 1.0, "output_per_million": 5.0}},
+    )
+    observability = ObservabilityContext(tracer=NoOpTracer(), config=obs_config)
+
+    verify_citations(FakeClient(), "q", answer, {"abc123": "text"}, config, observability=observability)
+
+    # The exact bug this block's Chunk 7.6 shipped-then-fixed: report_usage must only
+    # fire when a caller explicitly opts in, but once it does, real cost must land in
+    # the real daily total, not just be computed and discarded.
+    assert get_daily_total(tmp_path / "daily_cost.sqlite3") == 1.0
 
 
 def test_verify_citations_raises_clear_error_on_truncated_output():

@@ -12,6 +12,8 @@ from eval.schema import EvalResult, EvalRunResult, GoldenQuestion
 from generate.client import generate_answer
 from generate.prompt import PROMPT_VERSION as GENERATION_PROMPT_VERSION
 from ingest.vector_index import get_chunk_texts
+from observability.context import ObservabilityContext
+from observability.langfuse_tracer import get_tracer
 from rerank.cross_encoder import rerank
 from retrieval.hybrid import hybrid_retrieve
 
@@ -23,21 +25,32 @@ def _git_commit_sha() -> str:
 
 
 def _evaluate_one(
-    question: GoldenQuestion, client, bm25_dir: Path, vector_db_path: Path, settings: Settings
+    question: GoldenQuestion, client, bm25_dir: Path, vector_db_path: Path, settings: Settings,
+    observability: ObservabilityContext,
 ) -> EvalResult:
-    top_n_ids = hybrid_retrieve(bm25_dir, vector_db_path, question.question, settings.retrieval)
+    top_n_ids = hybrid_retrieve(
+        bm25_dir, vector_db_path, question.question, settings.retrieval, observability=observability
+    )
     texts = get_chunk_texts(vector_db_path, top_n_ids) if top_n_ids else {}
-    reranked_ids = rerank(question.question, [(cid, texts[cid]) for cid in top_n_ids], settings.rerank)
+    reranked_ids = rerank(
+        question.question, [(cid, texts[cid]) for cid in top_n_ids], settings.rerank, observability=observability
+    )
     relevant = set(question.relevant_chunk_ids)
 
     # Reuses the retrieve+rerank pass above for generation instead of calling
     # answer_with_verified_citations (which would retrieve+rerank again internally) --
     # rerank alone costs ~5.3s/query on the real corpus (BUGS.md), and this harness is
     # what Block 8 wires into CI, so a second pass per question is not free.
-    answer = generate_answer(client, question.question, [(cid, texts[cid]) for cid in reranked_ids], settings.generation)
-    verified = verify_citations(client, question.question, answer, texts, settings.citations)
+    answer = generate_answer(
+        client, question.question, [(cid, texts[cid]) for cid in reranked_ids], settings.generation,
+        observability=observability,
+    )
+    verified = verify_citations(
+        client, question.question, answer, texts, settings.citations, observability=observability
+    )
     judgment = judge_answer(
-        client, question.question, verified.answer_text, question.reference_notes, settings.eval
+        client, question.question, verified.answer_text, question.reference_notes, settings.eval,
+        observability_config=observability.config,
     )
 
     return EvalResult(
@@ -57,6 +70,7 @@ def run_eval(
 ) -> EvalRunResult:
     cache_path = Path(settings.eval.cache_path)
     cfg_hash = config_hash(settings)
+    observability = ObservabilityContext(tracer=get_tracer(settings), config=settings.observability)
     results: list[EvalResult] = []
 
     for question in golden_questions:
@@ -66,7 +80,7 @@ def run_eval(
         if cached is not None:
             results.append(cached)
             continue
-        result = _evaluate_one(question, client, bm25_dir, vector_db_path, settings)
+        result = _evaluate_one(question, client, bm25_dir, vector_db_path, settings, observability)
         save_cached_result(cache_path, question.id, cfg_hash, result)
         results.append(result)
 

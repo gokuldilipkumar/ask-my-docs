@@ -7,6 +7,8 @@ from config.settings import GenerationConfig, ObservabilityConfig, Settings
 from generate.client import generate_answer
 from generate.schema import GeneratedAnswer
 from observability.context import ObservabilityContext
+from observability.daily_cost import get_daily_total
+from observability.tracer import NoOpTracer
 
 
 def test_empty_chunks_returns_canned_answer_without_calling_client():
@@ -66,7 +68,7 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
     assert result is canned
 
 
-def test_generate_answer_opens_a_generation_span_and_reports_usage():
+def test_generate_answer_opens_a_generation_span_and_reports_usage(spy_tracer):
     canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
 
     class FakeMessages:
@@ -84,35 +86,17 @@ def test_generate_answer_opens_a_generation_span_and_reports_usage():
         def with_options(self, **kwargs):
             return FakeScopedClient()
 
-    class SpyTracer:
-        def __init__(self):
-            self.spans = []
-
-        def span(self, name, *, as_type="span", model=None):
-            self.spans.append({"name": name, "as_type": as_type, "model": model})
-            return _SpySpanCtx(self)
-
-    class _SpySpanCtx:
-        def __init__(self, tracer):
-            self.tracer = tracer
-            self.update_calls = []
-
-        def __enter__(self):
-            return self
-
-        def update(self, **kwargs):
-            self.update_calls.append(kwargs)
-
-        def __exit__(self, *exc):
-            return False
-
     config = GenerationConfig(model="claude-sonnet-5")
-    tracer = SpyTracer()
-    observability = ObservabilityContext(tracer=tracer, config=ObservabilityConfig(price_table={}))
+    price_table = {"claude-sonnet-5": {"input_per_million": 3.0, "output_per_million": 15.0}}
+    observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig(price_table=price_table))
 
     generate_answer(FakeClient(), "q", [("abc123", "text")], config, observability=observability)
 
-    assert tracer.spans == [{"name": "generate.answer", "as_type": "generation", "model": "claude-sonnet-5"}]
+    assert spy_tracer.spans == [{"name": "generate.answer", "as_type": "generation", "model": "claude-sonnet-5"}]
+    # cost = (10 input tokens * $3/Mtok + 5 output tokens * $15/Mtok) / 1_000_000 = $0.000105
+    assert spy_tracer.span_ctxs[0].update_calls == [
+        {"usage_details": {"input": 10, "output": 5}, "cost_details": {"total": 0.000105}}
+    ]
 
 
 def test_generate_answer_defaults_to_noop_tracer_when_observability_omitted():
@@ -139,6 +123,39 @@ def test_generate_answer_defaults_to_noop_tracer_when_observability_omitted():
     result = generate_answer(FakeClient(), "q", [("abc123", "text")], config)
 
     assert result is canned
+
+
+def test_generate_answer_records_cost_when_observability_given(tmp_path):
+    canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
+
+    class FakeMessages:
+        def parse(self, **kwargs):
+            class FakeResponse:
+                parsed_output = canned
+                usage = SimpleNamespace(input_tokens=1_000_000, output_tokens=0)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        messages = FakeMessages()
+
+    class FakeClient:
+        def with_options(self, **kwargs):
+            return FakeScopedClient()
+
+    config = GenerationConfig(model="claude-sonnet-5")
+    obs_config = ObservabilityConfig(
+        cost_db_path=str(tmp_path / "daily_cost.sqlite3"),
+        price_table={"claude-sonnet-5": {"input_per_million": 3.0, "output_per_million": 15.0}},
+    )
+    observability = ObservabilityContext(tracer=NoOpTracer(), config=obs_config)
+
+    generate_answer(FakeClient(), "q", [("abc123", "text")], config, observability=observability)
+
+    # The exact bug this block's Chunk 7.6 shipped-then-fixed: report_usage must only
+    # fire when a caller explicitly opts in, but once it does, real cost must land in
+    # the real daily total, not just be computed and discarded.
+    assert get_daily_total(tmp_path / "daily_cost.sqlite3") == 3.0
 
 
 def test_generate_answer_raises_clear_error_on_truncated_output():
