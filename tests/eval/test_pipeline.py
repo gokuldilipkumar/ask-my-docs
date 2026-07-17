@@ -203,3 +203,80 @@ def test_run_eval_full_mode_still_uses_the_cache(monkeypatch):
 
     assert call_counts["cache_get"] == 1
     assert call_counts["cache_save"] == 1
+
+
+def test_evaluate_one_wraps_the_whole_question_in_one_parent_span(monkeypatch, spy_tracer):
+    def fake_hybrid_retrieve(bm25_dir, vector_db_path, question, config, observability=None):
+        with observability.tracer.span("fake.hybrid_retrieve"):
+            pass
+        return ["a"]
+
+    def fake_rerank(question, candidates, config, observability=None):
+        with observability.tracer.span("fake.rerank"):
+            pass
+        return [cid for cid, _ in candidates]
+
+    def fake_get_chunk_texts(vector_db_path, ids):
+        return {cid: "text" for cid in ids}
+
+    def fake_generate_answer(client, question, chunks, config, observability=None):
+        with observability.tracer.span("fake.generate_answer"):
+            pass
+
+        class FakeAnswer:
+            answer_text = "answer"
+            citations = ["a"]
+
+        return FakeAnswer()
+
+    def fake_verify_citations(client, question, answer, chunk_texts, config, observability=None):
+        with observability.tracer.span("fake.verify_citations"):
+            pass
+
+        class FakeVerified:
+            answer_text = answer.answer_text
+            citations = answer.citations
+            coverage = 1.0
+            low_confidence = False
+
+        return FakeVerified()
+
+    def fake_judge_answer(client, question, answer_text, reference_notes, config, observability_config=None):
+        class FakeJudgment:
+            correct = True
+            complete = True
+
+        return FakeJudgment()
+
+    monkeypatch.setattr(pipeline, "get_tracer", lambda settings: spy_tracer)
+    monkeypatch.setattr(pipeline, "hybrid_retrieve", fake_hybrid_retrieve)
+    monkeypatch.setattr(pipeline, "rerank", fake_rerank)
+    monkeypatch.setattr(pipeline, "get_chunk_texts", fake_get_chunk_texts)
+    monkeypatch.setattr(pipeline, "generate_answer", fake_generate_answer)
+    monkeypatch.setattr(pipeline, "verify_citations", fake_verify_citations)
+    monkeypatch.setattr(pipeline, "judge_answer", fake_judge_answer)
+    monkeypatch.setattr(pipeline, "get_cached_result", lambda *a: None)
+    monkeypatch.setattr(pipeline, "save_cached_result", lambda *a: None)
+
+    question = GoldenQuestion(
+        id="q1", question="q", relevant_chunk_ids=["a"], reference_notes="notes", reviewed=True
+    )
+    settings = Settings(anthropic_api_key="placeholder")
+
+    run_eval(
+        [question], client=object(), bm25_dir=Path("unused"), vector_db_path=Path("unused"), settings=settings,
+    )
+
+    # Same bug shape as citations/pipeline.py's answer_with_verified_citations: without
+    # a wrapping span around the whole per-question call chain, an eval run's 4 real
+    # API-touching spans (retrieve/rerank/generate/verify) would each become their own
+    # separate root trace instead of nesting under one trace per question.
+    outer = "eval.question.q1"
+    assert spy_tracer.events[0] == ("enter", outer)
+    assert spy_tracer.events[-1] == ("exit", outer)
+    assert spy_tracer.events[1:-1] == [
+        ("enter", "fake.hybrid_retrieve"), ("exit", "fake.hybrid_retrieve"),
+        ("enter", "fake.rerank"), ("exit", "fake.rerank"),
+        ("enter", "fake.generate_answer"), ("exit", "fake.generate_answer"),
+        ("enter", "fake.verify_citations"), ("exit", "fake.verify_citations"),
+    ]

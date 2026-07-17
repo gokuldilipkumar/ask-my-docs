@@ -8,12 +8,19 @@ from ingest.models import Chunk
 
 
 def pytest_collection_modifyitems(config, items):
-    if os.environ.get("RUN_LIVE_API_TESTS") == "1":
-        return
-    skip_live = pytest.mark.skip(reason="set RUN_LIVE_API_TESTS=1 to run tests that call the real Anthropic API")
-    for item in items:
-        if "live_api" in item.keywords:
-            item.add_marker(skip_live)
+    if os.environ.get("RUN_LIVE_API_TESTS") != "1":
+        skip_live_api = pytest.mark.skip(reason="set RUN_LIVE_API_TESTS=1 to run tests that call the real Anthropic API")
+        for item in items:
+            if "live_api" in item.keywords:
+                item.add_marker(skip_live_api)
+
+    if os.environ.get("RUN_LIVE_LANGFUSE_TESTS") != "1":
+        skip_live_langfuse = pytest.mark.skip(
+            reason="set RUN_LIVE_LANGFUSE_TESTS=1 to run tests that call a real Langfuse Cloud project"
+        )
+        for item in items:
+            if "live_langfuse" in item.keywords:
+                item.add_marker(skip_live_langfuse)
 
 
 @pytest.fixture
@@ -38,29 +45,37 @@ def make_chunk():
 def spy_tracer():
     """A Tracer that records every span opened (name/as_type/model) and every
     .update(**kwargs) call made on it, for asserting on tracing/cost-reporting wiring
-    without a real Langfuse client."""
+    without a real Langfuse client. Also records enter/exit order in `.events` --
+    real Langfuse/OTel nesting requires a child span's enter/exit to fall strictly
+    between its parent's, so a structural test can catch a missing wrapping `with`
+    block (a parent span never actually enclosing its children) without a real backend."""
 
     class _SpySpanCtx:
-        def __init__(self):
+        def __init__(self, name, events):
+            self.name = name
+            self._events = events
             self.update_calls = []
 
         def __enter__(self):
+            self._events.append(("enter", self.name))
             return self
 
         def update(self, **kwargs):
             self.update_calls.append(kwargs)
 
         def __exit__(self, *exc):
+            self._events.append(("exit", self.name))
             return False
 
     class SpyTracer:
         def __init__(self):
             self.spans = []
             self.span_ctxs = []
+            self.events = []
 
         def span(self, name, *, as_type="span", model=None):
             self.spans.append({"name": name, "as_type": as_type, "model": model})
-            ctx = _SpySpanCtx()
+            ctx = _SpySpanCtx(name, self.events)
             self.span_ctxs.append(ctx)
             return ctx
 
