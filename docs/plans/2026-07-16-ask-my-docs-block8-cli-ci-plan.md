@@ -34,15 +34,15 @@
 
 **Success criteria**
 
-- [ ] `query` CLI command answers a question end-to-end via `answer_with_verified_citations` and prints the answer, citations, coverage/low-confidence flag, and running daily cost.
-- [ ] `run_eval`/`_evaluate_one` support a `retrieval_only` mode computing only `recall_at_k`/`mrr`/`ndcg` (pure CPU, zero Anthropic API calls); `EvalRunResult.retrieval_only` records which mode produced it; the sqlite response cache is bypassed in this mode.
-- [ ] `compare_to_baseline` skips metric fields that are `None` on either side, so a `retrieval_only` current run can be compared against a full-run baseline.
-- [ ] `eval` CLI command runs the harness (full or `--retrieval-only`), prints a per-metric PASS/FAIL vs. the latest baseline, exits non-zero if any compared metric fails its tolerance band, optionally saves a new baseline (`--save-baseline`, refused in `--retrieval-only` mode), and prints the running daily cost.
-- [ ] A deliberately-regressed `EvalRunResult` fixture proves the `eval` command's exit code actually goes non-zero (design doc acceptance criterion: "a deliberately bad prompt/config change fails the CI gate").
-- [ ] `.github/workflows/cheap-gate.yml` runs the fast test suite + `eval --retrieval-only` on every push, fails the job if any retrieval metric regresses beyond tolerance, spends zero real API dollars.
-- [ ] `.github/workflows/nightly-eval.yml` runs the full `eval` (all metrics, real API cost) on a daily schedule + manual `workflow_dispatch`, using a real `ANTHROPIC_API_KEY` secret, and saves a new baseline on success.
-- [ ] Repository pushed to a real GitHub remote; both workflows verified actually running (not just YAML sitting unexecuted) — `cheap-gate.yml` on the push itself, `nightly-eval.yml` via a manual `workflow_dispatch` trigger.
-- [ ] `data/index/` is tracked in git (~7.3MB); `.gitignore` still excludes the source PDF and per-machine sqlite state.
+- [x] `query` CLI command answers a question end-to-end via `answer_with_verified_citations` and prints the answer, citations, coverage/low-confidence flag, and running daily cost.
+- [x] `run_eval`/`_evaluate_one` support a `retrieval_only` mode computing only `recall_at_k`/`mrr`/`ndcg` (pure CPU, zero Anthropic API calls); `EvalRunResult.retrieval_only` records which mode produced it; the sqlite response cache is bypassed in this mode.
+- [x] `compare_to_baseline` skips metric fields that are `None` on either side, so a `retrieval_only` current run can be compared against a full-run baseline.
+- [x] `eval` CLI command runs the harness (full or `--retrieval-only`), prints a per-metric PASS/FAIL vs. the latest baseline, exits non-zero if any compared metric fails its tolerance band, optionally saves a new baseline (`--save-baseline`, refused in `--retrieval-only` mode), and prints the running daily cost.
+- [x] A deliberately-regressed `EvalRunResult` fixture proves the `eval` command's exit code actually goes non-zero (design doc acceptance criterion: "a deliberately bad prompt/config change fails the CI gate").
+- [x] `.github/workflows/cheap-gate.yml` runs the fast test suite + `eval --retrieval-only` on every push, fails the job if any retrieval metric regresses beyond tolerance, spends zero real API dollars. **Verified on real GitHub Actions**: 126 fast + 11 slow tests + retrieval-only eval, all green, exact match with stored baseline.
+- [x] `.github/workflows/nightly-eval.yml` runs the full `eval` (all metrics, real API cost) on a daily schedule + manual `workflow_dispatch`, using a real `ANTHROPIC_API_KEY` secret, and saves a new baseline on success. **Verified on real GitHub Actions** (3rd attempt, after root-causing a `.env`-leading-space-in-secret gotcha — see `BUGS.md`): all 6 metrics PASS, correctness_rate improved 0.75→0.875, completeness_rate 0.5→0.625, new baseline auto-committed.
+- [x] Repository pushed to a real GitHub remote (`https://github.com/gokuldilipkumar/ask-my-docs`); both workflows verified actually running.
+- [x] `data/index/` is tracked in git (2.4MB after a clean re-ingest dropped stale multi-version cruft); `.gitignore` still excludes the source PDF and per-machine sqlite state.
 
 ---
 
