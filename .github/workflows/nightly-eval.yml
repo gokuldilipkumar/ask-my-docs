@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write  # the baseline-commit step pushes to the branch
 
+concurrency:
+  group: nightly-eval
+  cancel-in-progress: false  # let an in-progress full eval (real API cost) finish; just queue the next one
+
 jobs:
   full-eval:
     runs-on: ubuntu-latest
