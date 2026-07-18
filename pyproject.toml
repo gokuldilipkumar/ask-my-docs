@@ -1,7 +1,7 @@
 [project]
 name = "ask-my-docs"
 version = "0.1.0"
-description = "Add your description here"
+description = "Production-shaped RAG over the FAA Airplane Flying Handbook -- hybrid retrieval, reranking, cited generation, eval-gated CI, Langfuse observability."
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.116.0",

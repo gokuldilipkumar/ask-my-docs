@@ -47,7 +47,7 @@ already caught," below).
 
 ## Current Baseline Metrics
 
-| Metric | 2026-07-14 (first baseline) | 2026-07-17 (current, CI-produced) |
+| Metric | 2026-07-14 (first baseline) | 2026-07-18 (latest, CI-produced) |
 |---|---|---|
 | `mean_recall_at_k` | 0.616 | 0.616 |
 | `mean_mrr` | 0.906 | 0.906 |
@@ -56,7 +56,10 @@ already caught," below).
 | `correctness_rate` | 0.750 | 0.875 |
 | `completeness_rate` | 0.500 | 0.625 |
 
-Source: `eval/baselines/20260714T151052Z_dfac1522.json`, `eval/baselines/20260717T095425Z_3c6a14e9.json`.
+Source: `eval/baselines/20260714T151052Z_dfac1522.json`, `eval/baselines/20260718T091928Z_f9eedb70.json`
+(`nightly-eval.yml` writes a new timestamped file on every scheduled run — this table is a
+snapshot; `load_latest_baseline` and the CI gate always compare against whatever file in
+`eval/baselines/` actually sorts last, not against this table).
 
 Retrieval metrics are unchanged between the two baselines — nothing in retrieval/rerank
 changed in that window. `correctness_rate` and `completeness_rate` improved
