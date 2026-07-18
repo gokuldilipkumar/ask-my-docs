@@ -1,52 +1,69 @@
 ---
-description: Update documentation, commit and push to the latest branch
-model: haiku
+description: Wrap up a build/audit session -- learning notes, changelog, project history, commit.
 ---
 
 # /closeout
 
-Use this workflow to wrap up a development session and maintain a clean project history.
-
-> **Model note**: Use the Haiku model for all doc-writing and file-editing steps in this workflow — it is fast and sufficient for structured documentation tasks. Only escalate to Sonnet/Opus if you encounter ambiguous content decisions that require judgment.
+Use this workflow to wrap up a development session once `/audit` has passed (or the user
+has explicitly chosen a lighter closeout after a clean audit with nothing to fix).
 
 ## Prerequisites
-- `/audit` has been completed and passed
-- `/fix` has been completed with zero remaining bugs/debt
-- `docs/BUGS.md` shows all items resolved for current phase
+- `/audit` has been run and its findings resolved (Blocking fixed, Improvements logged to
+  `BUGS.md`, Nitpicks acknowledged) — or the user has explicitly said to skip straight to
+  closeout after a clean result.
 
 ## The Process
 
-### 1. Integration of Learnings — `LEARNING_NOTES.md` (REQUIRED, never skip)
-- Append a dated entry to `LEARNING_NOTES.md` for this session. This is the user's primary learning artifact from the project — it is as mandatory as `PROJECT_HISTORY.md`.
-- Content: the *why* and *how it works* behind what was built or found — concept explanations, failure patterns (the wrong assumption, the "tell" that exposed it, the fix's reasoning), and rejected alternatives. Not a changelog rehash: `PROJECT_HISTORY.md` records what happened; `LEARNING_NOTES.md` teaches why it mattered.
-- Good sources: this session's `/kaizen` friction points, audit findings, decisions.log entries, and any moment where reality contradicted the plan or a library/model surprised us.
+### 1. `LEARNING_NOTES.md` (REQUIRED, never skip)
+Append a dated entry. This is the user's primary learning artifact from the project — as
+mandatory as `PROJECT_HISTORY.md`, and easy to silently skip since nothing else in the repo
+enforces it.
 
-### 2. Documentation Update
-- **Project History**: Update `PROJECT_HISTORY.md` — prepend a new dated entry at the top with:
-    - Date and Phase name
-    - Key Accomplishments (bullet points)
-    - Key Learnings (from Step 1)
-- **Roadmap**: Update `PROJECT_ROADMAP.md` — mark the just-completed phase with ✅ and check off all completed items.
-- **Bugs**: Ensure `docs/BUGS.md` — active table is clean (resolved items moved to Resolved section).
-- **README**: Update `README.md` to reflect the current state of the project:
-    - Move the just-completed phase from the "Future Roadmap" section to the "Core Features" section (or update existing feature bullets to include Phase additions).
-    - Update the "Future Roadmap" section so the *next* phase is listed first.
-    - Keep the README as a live "what does this app do today" document — not a historical log (that's `PROJECT_HISTORY.md`'s job).
+Content: the *why* and *how it works* behind what was built or found this session — concept
+explanations, failure patterns (the wrong assumption, the tell that exposed it, the fix's
+reasoning), and rejected alternatives. Not a changelog rehash: `PROJECT_HISTORY.md` records
+what happened; `LEARNING_NOTES.md` teaches why it mattered. Good sources: this session's
+`/kaizen` friction points, audit findings, `.agent/decisions.log` entries, and any moment
+where reality contradicted the plan or a library/model surprised us.
 
-### 3. Workflow Synchronization
-- Run the `/sync-workflows` workflow to ensure local workflow improvements are upstreamed to the quickstart repo (if applicable) or synced down.
-    - *Note*: If any workflow file (`~/.claude/commands/*.md`) was modified this session, push those changes.
+### 2. `CHANGELOG.md`
+Add an entry for this session's shipped changes — user-facing/portfolio-relevant framing
+(what changed, not the blow-by-blow of how it was built; that's `PROJECT_HISTORY.md`'s job).
 
-### 4. Git Hygiene + CI Check
-- **CI Smoke Test**: `npm run lint && npm test && npm run build` — must be clean before committing docs.
-- **Commit**: Stage and commit all documentation updates with a clear `docs(phase-N): closeout` message.
-- **Push**: Push the current feature/phase branch to remote.
-- **Secret Hygiene**: If the phase added new env vars, confirm they exist in GitHub → Settings → Secrets → Actions.
+### 3. `PROJECT_HISTORY.md`
+Append a new row to the Session Log table (bottom of file, chronological — this project's
+convention, not prepend-newest-first) with:
+- **Date**
+- **What I Did** — concrete, specific, names real files/commits/numbers where relevant
+- **Key Decisions** — the load-bearing *why*, not a restatement of what
+- **Next Steps** — what a future session should resume with, including any carried-forward
+  open items from `BUGS.md`
 
-### 5. Phase Transition (If Applicable)
-- **Check Roadmap**: Did we just complete a Phase?
-- **Branch**: If yes, ask the user if they want to start the next phase or stay in the current branch. If starting next phase, create: `git checkout -b phase-N` where N is the next phase number from the roadmap.
-- **Notify**: Inform user of the new active branch and what Phase N contains.
+### 4. `BUGS.md`
+Confirm every item resolved this session is checked off (`~~strikethrough~~` + a dated
+"Fixed" note, matching this file's existing convention) rather than left open by accident.
+Items deliberately deferred stay open with an accurate note of why.
 
-### 6. Summary
-- Provide a concise final summary (5–8 bullets max) covering: what shipped, what was deferred, test count delta, and next phase name.
+### 5. Plan Doc Checkboxes
+If a `docs/plans/*.md` plan was built this session, confirm its Success Criteria checkboxes
+are all checked (or explicitly marked as not applicable/deferred with a note) before moving
+on — a plan doc that says "not yet built" after the work shipped is exactly the kind of
+stale status marker `/audit`'s Documentation Freshness check looks for next time.
+
+### 6. Git Hygiene
+- **Test suite**: confirm `uv run pytest -q` is green (should already be true from
+  `/audit`; re-run if any doc/config drift was fixed since).
+- **Commit**: stage and commit the documentation updates with a clear
+  `[Docs] Closeout: <scope> - history, learning notes, changelog` message (matches this
+  project's atomic-commit convention, `.agent/decisions.log` for the *why*).
+- **Push**: push to the remote (`gokuldilipkumar/ask-my-docs`) unless the user says not to.
+
+### 7. Summary
+Provide a concise final summary (5-8 bullets max): what shipped, what was deferred, test
+count delta, and the next recommended step (`/plan` for the next block, or a specific
+`BUGS.md` item worth addressing next).
+
+## What this project does not have
+No `PROJECT_ROADMAP.md`, no phase branches, no `npm`/lint/build steps, no
+`/sync-workflows`, no CI-secret-hygiene step beyond what `/build`'s own CI chunks already
+verify. Do not add these back in without the user asking for them.
