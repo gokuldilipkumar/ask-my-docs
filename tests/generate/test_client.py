@@ -68,13 +68,16 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
     assert result is canned
 
 
-def test_generate_answer_passes_configured_temperature():
-    # generation.temperature defaults to 0.0 for reproducible answers -- the Anthropic
-    # SDK's own default (unpinned) is what caused q1 (VMC vs. VSO) to score
-    # correct=True on one real eval run and correct=False on an immediate re-run of
-    # the identical question (BUGS.md, Eval section), evidenced a second time during
-    # Block 9's own README-capture run. citations.judge_temperature/eval.judge_temperature
-    # were already pinned; generation was the one config left unpinned.
+def test_generate_answer_never_sends_deprecated_sampling_params():
+    # claude-sonnet-5 rejects temperature/top_p/top_k entirely (real 400 BadRequestError,
+    # confirmed by probe: "`temperature` is deprecated for this model" -- same for top_p/
+    # top_k). A generation.temperature field was added and shipped here to address real
+    # non-determinism findings (BUGS.md, Eval section), verified only against fake-client
+    # unit tests and never against the real API before pushing -- exactly the mistake
+    # build.md's Third-Party API Verification step exists to prevent. Reverted; this test
+    # exists so no future change re-introduces a deprecated sampling param without a real
+    # live_api check first (see test_generate_answer_cites_real_chunk_for_in_scope_question
+    # below, which would have caught this immediately had it been run pre-push).
     canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
 
     class FakeMessages:
@@ -102,15 +105,13 @@ def test_generate_answer_passes_configured_temperature():
             return self.scoped
 
     client = FakeClient()
-    config = GenerationConfig(temperature=0.3)
+    config = GenerationConfig()
 
     generate_answer(client, "What causes a stall?", [("abc123", "text")], config)
 
-    assert client.scoped.messages.parse_kwargs["temperature"] == 0.3
-
-
-def test_generation_config_defaults_temperature_to_zero():
-    assert GenerationConfig().temperature == 0.0
+    parse_kwargs = client.scoped.messages.parse_kwargs
+    for deprecated_param in ("temperature", "top_p", "top_k"):
+        assert deprecated_param not in parse_kwargs
 
 
 def test_generate_answer_opens_a_generation_span_and_reports_usage(spy_tracer):
