@@ -37,6 +37,7 @@ class GenerationConfig(BaseModel):
     max_tokens: int = 2048
     max_retries: int = 3
     timeout_seconds: float = 30.0
+    temperature: float = 0.0
 
 
 class CitationConfig(BaseModel):

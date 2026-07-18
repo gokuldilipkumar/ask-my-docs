@@ -23,6 +23,7 @@ def generate_answer(
             response = scoped_client.messages.parse(
                 model=config.model,
                 max_tokens=config.max_tokens,
+                temperature=config.temperature,
                 thinking={"type": "disabled"},
                 messages=[{"role": "user", "content": prompt}],
                 output_format=GeneratedAnswer,

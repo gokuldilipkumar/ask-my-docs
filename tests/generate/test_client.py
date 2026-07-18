@@ -68,6 +68,51 @@ def test_generate_answer_configures_client_with_retry_and_timeout():
     assert result is canned
 
 
+def test_generate_answer_passes_configured_temperature():
+    # generation.temperature defaults to 0.0 for reproducible answers -- the Anthropic
+    # SDK's own default (unpinned) is what caused q1 (VMC vs. VSO) to score
+    # correct=True on one real eval run and correct=False on an immediate re-run of
+    # the identical question (BUGS.md, Eval section), evidenced a second time during
+    # Block 9's own README-capture run. citations.judge_temperature/eval.judge_temperature
+    # were already pinned; generation was the one config left unpinned.
+    canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
+
+    class FakeMessages:
+        def __init__(self):
+            self.parse_kwargs = None
+
+        def parse(self, **kwargs):
+            self.parse_kwargs = kwargs
+
+            class FakeResponse:
+                parsed_output = canned
+                usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+
+            return FakeResponse()
+
+    class FakeScopedClient:
+        def __init__(self):
+            self.messages = FakeMessages()
+
+    class FakeClient:
+        def __init__(self):
+            self.scoped = FakeScopedClient()
+
+        def with_options(self, **kwargs):
+            return self.scoped
+
+    client = FakeClient()
+    config = GenerationConfig(temperature=0.3)
+
+    generate_answer(client, "What causes a stall?", [("abc123", "text")], config)
+
+    assert client.scoped.messages.parse_kwargs["temperature"] == 0.3
+
+
+def test_generation_config_defaults_temperature_to_zero():
+    assert GenerationConfig().temperature == 0.0
+
+
 def test_generate_answer_opens_a_generation_span_and_reports_usage(spy_tracer):
     canned = GeneratedAnswer(answer_text="Stalls happen when...", citations=["abc123"])
 

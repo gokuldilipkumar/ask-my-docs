@@ -19,6 +19,7 @@ generation:
   max_tokens: 2048
   max_retries: 3
   timeout_seconds: 30.0
+  temperature: 0.0
 
 citations:
   low_confidence_threshold: 0.7
