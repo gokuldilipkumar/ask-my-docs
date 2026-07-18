@@ -147,3 +147,21 @@ comparison without constant false-positive CI failures.
 Neither of these was staged for this report — both are real findings from
 `.agent/decisions.log` (2026-07-14) and `PROJECT_HISTORY.md`, included here as evidence the
 harness does real work, not just computes numbers.
+
+**A second, live instance, caught while writing this report.** Running the full
+`eval --index data/index` command for this report's own quickstart capture produced a real
+`correctness_rate`/`completeness_rate` gate FAIL — not staged, not expected:
+
+```
+correctness_rate:   FAIL (current=0.625, baseline=0.875)
+completeness_rate:  FAIL (current=0.375, baseline=0.625)
+```
+
+Retrieval metrics (`recall_at_k`/`mrr`/`ndcg`/`coverage`) were all unchanged and PASS —
+only the two LLM-judged dimensions moved, on the same 8 questions, same config, same
+prompts as the current baseline. This is the same phenomenon as the VMC/VSO finding above,
+observed a second time, live, days later, with zero code changes in between — direct
+evidence that `nightly-eval.yml`'s judge-based gate is expected to show real variance
+between runs, which is exactly why the cheap, deterministic `--retrieval-only` gate (not
+this one) runs on every push, and the full judge-based gate runs nightly rather than
+per-commit.
