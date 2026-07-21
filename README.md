@@ -130,6 +130,50 @@ $ uv run pytest
 `RUN_LIVE_API_TESTS=1` / `RUN_LIVE_LANGFUSE_TESTS=1` so CI and casual local runs never
 spend money by accident.)
 
+## Chat Interface
+
+A Streamlit chat UI wraps `answer_with_verified_citations` for anyone who'd rather ask
+questions in a browser than via the CLI. It's chat-*styled* — a running thread of past
+turns — but each question is still answered independently; there's no conversational memory
+or follow-up resolution (`answer_with_verified_citations` takes one flat question, not a
+history), so a second question doesn't implicitly refer back to the first.
+
+Run it locally:
+
+```
+$ PYTHONPATH=src uv run streamlit run src/app/streamlit_app.py
+```
+
+(`PYTHONPATH=src` is required for the same reason it's required for `python -m app.main` —
+see the Quickstart section's src-layout note; `streamlit run` is a manual, non-pytest
+invocation too.)
+
+A real question against the real corpus, answered live:
+
+![Ask My Docs chat UI: a question about VMC vs. VSO, answered with inline chunk citations and a running daily-cost sidebar](docs/images/chat-ui-answer.jpg)
+
+Citations resolve to a human-readable chapter/section, not a raw chunk-id hash — the
+`data/index/chunk_metadata.json` sidecar (written at `ingest` time) makes that possible:
+
+![Ask My Docs chat UI: the Sources panel expanded, showing "Ch. 13: Transition to Multiengine Airplanes — Engine Inoperative Flight Principles" instead of a raw chunk-id](docs/images/chat-ui-sources.jpg)
+
+Two things worth calling out honestly rather than glossing over:
+
+- The generated answer's *inline* bracketed citations (`[471132ed8f396c5f]`) are the
+  generation prompt's own citation format (`prompts/answer_v1.md` instructs the model to
+  cite every claim by chunk id in the prose itself) — a separate mechanism from the
+  structured `citations` field the Sources panel resolves. Rewriting inline prose citations
+  would mean post-processing free-form LLM output, out of scope here.
+- Because `printed_page_label` isn't wired to page-footer detection yet (a pre-existing,
+  deliberately deferred gap — see `BUGS.md`), several citations from the same handbook
+  section render identically (e.g. four "Ch. 13: ... Engine Inoperative Flight Principles"
+  entries above) — real corpus behavior, not a display bug, and a direct consequence of that
+  known limitation.
+
+**Deploying**: pushing this repo to a GitHub-linked [Streamlit Community
+Cloud](https://streamlit.io/cloud) account turns this into a shareable public demo link —
+that's a manual step tied to your own Streamlit account, not something this repo automates.
+
 ## Observability
 
 Every query runs inside one Langfuse trace, with every pipeline stage as a nested,
