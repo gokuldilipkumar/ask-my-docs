@@ -30,6 +30,7 @@ class RerankConfig(BaseModel):
     enabled: bool = True
     model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     top_k: int = 5
+    max_length: int | None = None
 
 
 class GenerationConfig(BaseModel):

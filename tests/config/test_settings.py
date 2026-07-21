@@ -51,3 +51,24 @@ def test_env_var_overrides_yaml_value(tmp_path, monkeypatch):
     settings = Settings()
 
     assert settings.retrieval.rrf_k == 30
+
+
+def test_rerank_max_length_defaults_to_none(tmp_path, monkeypatch):
+    (tmp_path / "config.yaml").write_text("chunking:\n  min_tokens: 400\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    settings = Settings()
+
+    assert settings.rerank.max_length is None
+
+
+def test_rerank_max_length_loads_from_yaml(tmp_path, monkeypatch):
+    yaml_content = "rerank:\n  max_length: 256\n"
+    (tmp_path / "config.yaml").write_text(yaml_content)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    settings = Settings()
+
+    assert settings.rerank.max_length == 256
