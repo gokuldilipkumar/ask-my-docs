@@ -78,3 +78,25 @@ def test_sidebar_shows_budget_cap_warning_when_exceeded(monkeypatch):
         at.run()
 
     assert len(at.sidebar.warning) == 1
+
+
+def test_pipeline_error_shows_st_error_and_session_stays_usable(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    at = AppTest.from_file(APP_PATH)
+
+    with patch("citations.pipeline.answer_with_verified_citations", side_effect=RuntimeError("boom")), \
+         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.check_budget", return_value=False):
+        at.run()
+        at.chat_input[0].set_value("What causes a stall?").run()
+
+    assert len(at.error) == 1
+    assert "boom" in at.error[0].value
+    assert not any(turn["role"] == "assistant" for turn in at.session_state["history"])
+
+    with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
+         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.check_budget", return_value=False):
+        at.chat_input[0].set_value("A follow-up question?").run()
+
+    assert any(turn["role"] == "assistant" for turn in at.session_state["history"])

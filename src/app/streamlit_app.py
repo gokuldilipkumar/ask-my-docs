@@ -64,17 +64,22 @@ if question:
     with st.chat_message("user"):
         st.markdown(question)
 
-    with st.spinner("Searching the handbook..."):
-        result = answer_with_verified_citations(question, client, INDEX_DIR / "bm25", INDEX_DIR / "lancedb", settings)
-
-    sources = _resolve_sources(result.citations) if result.citations else []
-    with st.chat_message("assistant"):
-        _render_turn(result.answer_text, sources, result.low_confidence)
-    st.session_state.history.append(
-        {
-            "role": "assistant",
-            "content": result.answer_text,
-            "sources": sources,
-            "low_confidence": result.low_confidence,
-        }
-    )
+    try:
+        with st.spinner("Searching the handbook..."):
+            result = answer_with_verified_citations(
+                question, client, INDEX_DIR / "bm25", INDEX_DIR / "lancedb", settings
+            )
+    except Exception as e:
+        st.error(f"Something went wrong answering that question: {e}")
+    else:
+        sources = _resolve_sources(result.citations) if result.citations else []
+        with st.chat_message("assistant"):
+            _render_turn(result.answer_text, sources, result.low_confidence)
+        st.session_state.history.append(
+            {
+                "role": "assistant",
+                "content": result.answer_text,
+                "sources": sources,
+                "low_confidence": result.low_confidence,
+            }
+        )
