@@ -53,3 +53,28 @@ def test_answer_shows_resolved_sources_and_low_confidence_warning(monkeypatch):
     assert "Total Energy" in all_markdown
     assert "abc123" not in all_markdown
     assert len(at.warning) == 1
+
+
+def test_sidebar_shows_daily_cost_and_no_warning_under_cap(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    at = AppTest.from_file(APP_PATH)
+
+    with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
+         patch("observability.daily_cost.get_daily_total", return_value=0.0421), \
+         patch("observability.daily_cost.check_budget", return_value=False):
+        at.run()
+
+    assert at.sidebar.metric[0].value == "$0.0421"
+    assert len(at.sidebar.warning) == 0
+
+
+def test_sidebar_shows_budget_cap_warning_when_exceeded(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    at = AppTest.from_file(APP_PATH)
+
+    with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
+         patch("observability.daily_cost.get_daily_total", return_value=6.0), \
+         patch("observability.daily_cost.check_budget", return_value=True):
+        at.run()
+
+    assert len(at.sidebar.warning) == 1

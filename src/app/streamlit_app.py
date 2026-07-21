@@ -6,6 +6,7 @@ import streamlit as st
 from citations.pipeline import answer_with_verified_citations
 from config import get_settings
 from ingest.chunk_metadata import format_citation, load_chunk_metadata
+from observability.daily_cost import check_budget, get_daily_total
 
 INDEX_DIR = Path("data/index")
 
@@ -21,6 +22,13 @@ if "history" not in st.session_state:
 
 settings = get_settings()
 client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+cost_db_path = Path(settings.observability.cost_db_path)
+daily_total = get_daily_total(cost_db_path)
+st.sidebar.metric("Today's cost", f"${daily_total:.4f}")
+if check_budget(cost_db_path, settings.observability.daily_cost_cap_usd):
+    st.sidebar.warning(f"Daily cost cap exceeded (${settings.observability.daily_cost_cap_usd:.2f})")
+
 
 def _resolve_sources(chunk_ids: list[str]) -> list[str]:
     metadata = load_chunk_metadata(INDEX_DIR / "chunk_metadata.json")
