@@ -83,11 +83,16 @@ Checked 80 packages in 5ms
 
 The built index ships in the repo (`data/index/`, ~2.4MB), so querying works immediately —
 no need to re-ingest the 273MB source PDF first. (`ingest` is available if you want to
-rebuild it: `uv run python -m app.main ingest --pdf "<handbook>.pdf" --out data/index`,
+rebuild it: `PYTHONPATH=src uv run python -m app.main ingest --pdf "<handbook>.pdf" --out data/index`,
 ~3.5 minutes real time on this corpus.)
 
+This project uses a `src/` layout (`src/ingest/`, `src/app/`, etc.), and pytest's own
+`pythonpath = ["src"]` setting (`pyproject.toml`) only applies inside pytest — any manual,
+non-pytest invocation (`python -m app.main`, `streamlit run`, ...) needs `PYTHONPATH=src` set
+explicitly, or it fails with `ModuleNotFoundError: No module named 'app'`.
+
 ```
-$ uv run python -m app.main query --question "What is the FAA Wings Program?" --index data/index
+$ PYTHONPATH=src uv run python -m app.main query --question "What is the FAA Wings Program?" --index data/index
 
 The FAA WINGS Program (formally the Pilot Proficiency Awards Wings Program) is a program
 that provides continuing pilot education, offering study materials and resources pilots
@@ -102,7 +107,7 @@ Daily cost so far: $0.0804
 ```
 
 ```
-$ uv run python -m app.main eval --index data/index --retrieval-only
+$ PYTHONPATH=src uv run python -m app.main eval --index data/index --retrieval-only
 
 mean_recall_at_k: PASS (current=0.616, baseline=0.616)
 mean_mrr: PASS (current=0.906, baseline=0.906)
@@ -145,8 +150,8 @@ $ PYTHONPATH=src uv run streamlit run src/app/streamlit_app.py
 ```
 
 (`PYTHONPATH=src` is required for the same reason it's required for `python -m app.main` —
-see the Quickstart section's src-layout note; `streamlit run` is a manual, non-pytest
-invocation too.)
+see the Quickstart section's `src/`-layout note above; `streamlit run` is a manual,
+non-pytest invocation too.)
 
 A real question against the real corpus, answered live:
 
