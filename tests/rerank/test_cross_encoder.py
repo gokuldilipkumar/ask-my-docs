@@ -10,7 +10,7 @@ def test_disabled_rerank_preserves_fused_order_and_truncates(monkeypatch):
     monkeypatch.setattr(
         cross_encoder,
         "_get_model",
-        lambda name: pytest.fail("passthrough must not load the model"),
+        lambda name, max_length: pytest.fail("passthrough must not load the model"),
     )
     candidates = [("b", "text b"), ("a", "text a"), ("c", "text c")]
     config = RerankConfig(enabled=False, top_k=2)
@@ -22,7 +22,7 @@ def test_empty_candidates_return_empty_without_loading_model(monkeypatch):
     monkeypatch.setattr(
         cross_encoder,
         "_get_model",
-        lambda name: pytest.fail("empty input must not load the model"),
+        lambda name, max_length: pytest.fail("empty input must not load the model"),
     )
     config = RerankConfig(enabled=True, top_k=5)
 
@@ -36,7 +36,7 @@ def test_rerank_loads_the_model_named_in_config(monkeypatch):
         def predict(self, pairs):
             return [0.0] * len(pairs)
 
-    def fake_get_model(name):
+    def fake_get_model(name, max_length):
         captured["name"] = name
         return FakeModel()
 
@@ -70,7 +70,7 @@ def test_rerank_opens_one_span_when_scoring(monkeypatch, spy_tracer):
         def predict(self, pairs):
             return [0.0] * len(pairs)
 
-    monkeypatch.setattr(cross_encoder, "_get_model", lambda name: FakeModel())
+    monkeypatch.setattr(cross_encoder, "_get_model", lambda name, max_length: FakeModel())
 
     observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig())
     config = RerankConfig(enabled=True, top_k=1)
@@ -82,7 +82,7 @@ def test_rerank_opens_one_span_when_scoring(monkeypatch, spy_tracer):
 
 def test_disabled_rerank_opens_no_span(monkeypatch, spy_tracer):
     monkeypatch.setattr(
-        cross_encoder, "_get_model", lambda name: pytest.fail("passthrough must not load the model")
+        cross_encoder, "_get_model", lambda name, max_length: pytest.fail("passthrough must not load the model")
     )
 
     observability = ObservabilityContext(tracer=spy_tracer, config=ObservabilityConfig())
@@ -93,6 +93,25 @@ def test_disabled_rerank_opens_no_span(monkeypatch, spy_tracer):
     assert spy_tracer.spans == []
 
 
+def test_rerank_passes_max_length_to_get_model(monkeypatch):
+    captured = {}
+
+    class FakeModel:
+        def predict(self, pairs):
+            return [0.0] * len(pairs)
+
+    def fake_get_model(name, max_length):
+        captured["max_length"] = max_length
+        return FakeModel()
+
+    monkeypatch.setattr(cross_encoder, "_get_model", fake_get_model)
+    config = RerankConfig(enabled=True, max_length=256, top_k=1)
+
+    rerank("q", [("a", "text")], config)
+
+    assert captured["max_length"] == 256
+
+
 def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len(monkeypatch):
     # truncation is pure slicing — no need for the real model (audit finding);
     # ascending fake scores make the expected order deterministic: c > b > a
@@ -100,7 +119,7 @@ def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len(monkeypatch):
         def predict(self, pairs):
             return list(range(len(pairs)))
 
-    monkeypatch.setattr(cross_encoder, "_get_model", lambda name: FakeModel())
+    monkeypatch.setattr(cross_encoder, "_get_model", lambda name, max_length: FakeModel())
     candidates = [("a", "t1"), ("b", "t2"), ("c", "t3")]
 
     top2 = rerank("q", candidates, RerankConfig(enabled=True, top_k=2))

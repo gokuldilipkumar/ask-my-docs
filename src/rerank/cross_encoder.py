@@ -3,14 +3,15 @@ from sentence_transformers import CrossEncoder
 from config.settings import RerankConfig
 from observability.context import ObservabilityContext, noop_observability
 
-# keyed by model name because the reranker is config-swappable
-_models: dict[str, CrossEncoder] = {}
+# keyed by (model name, max_length) because the reranker is config-swappable
+_models: dict[tuple[str, int | None], CrossEncoder] = {}
 
 
-def _get_model(model_name: str) -> CrossEncoder:
-    if model_name not in _models:
-        _models[model_name] = CrossEncoder(model_name, device="cpu")
-    return _models[model_name]
+def _get_model(model_name: str, max_length: int | None) -> CrossEncoder:
+    key = (model_name, max_length)
+    if key not in _models:
+        _models[key] = CrossEncoder(model_name, device="cpu", max_length=max_length)
+    return _models[key]
 
 
 def rerank(
@@ -24,7 +25,7 @@ def rerank(
         return ids[: config.top_k]
     observability = observability or noop_observability()
     with observability.tracer.span("rerank.score"):
-        model = _get_model(config.model)
+        model = _get_model(config.model, config.max_length)
         scores = model.predict([(query, text) for _, text in candidates])
     ranked = sorted(zip(ids, scores, strict=True), key=lambda pair: pair[1], reverse=True)
     return [cid for cid, _ in ranked[: config.top_k]]
