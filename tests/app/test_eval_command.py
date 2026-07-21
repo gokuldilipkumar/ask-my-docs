@@ -25,7 +25,7 @@ def test_eval_command_passes_and_exits_zero(monkeypatch):
     monkeypatch.setattr(app_main, "run_eval", lambda *a, **k: current)
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: baseline)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     result = runner.invoke(app, ["eval"])
@@ -42,7 +42,7 @@ def test_eval_command_exits_nonzero_on_regression(monkeypatch):
     monkeypatch.setattr(app_main, "run_eval", lambda *a, **k: regressed)
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: good_baseline)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     result = runner.invoke(app, ["eval"])
@@ -57,7 +57,7 @@ def test_eval_command_reports_no_baseline_and_exits_zero(monkeypatch):
     monkeypatch.setattr(app_main, "run_eval", lambda *a, **k: _run_result())
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: None)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     result = runner.invoke(app, ["eval"])
@@ -73,7 +73,7 @@ def test_eval_command_saves_baseline_when_requested(monkeypatch):
     monkeypatch.setattr(app_main, "run_eval", lambda *a, **k: _run_result())
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: None)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setattr(app_main, "save_baseline_run", lambda result, path: saved.append((result, path)) or "saved.json")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
@@ -95,7 +95,7 @@ def test_eval_command_refuses_to_save_baseline_in_retrieval_only_mode(monkeypatc
     monkeypatch.setattr(app_main, "run_eval", lambda *a, **k: retrieval_only_result)
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: None)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setattr(app_main, "save_baseline_run", lambda result, path: saved.append((result, path)) or "saved.json")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
@@ -118,7 +118,7 @@ def test_eval_command_passes_retrieval_only_flag_through_to_run_eval(monkeypatch
     monkeypatch.setattr(app_main, "run_eval", fake_run_eval)
     monkeypatch.setattr(app_main, "load_latest_baseline", lambda *a: None)
     monkeypatch.setattr(app_main, "load_golden_questions", lambda *a: [])
-    monkeypatch.setattr(app_main, "get_daily_total", lambda *a: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda *a: "$0.0000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     runner.invoke(app, ["eval", "--retrieval-only"])

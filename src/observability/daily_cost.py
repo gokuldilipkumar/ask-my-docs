@@ -42,3 +42,7 @@ def get_daily_total(db_path: Path, day: str | None = None) -> float:
 def check_budget(db_path: Path, cap_usd: float, day: str | None = None) -> bool:
     """True once today's running total exceeds cap_usd. Caller decides what to do (warn, never block)."""
     return get_daily_total(db_path, day) > cap_usd
+
+
+def format_daily_cost(db_path: Path, day: str | None = None) -> str:
+    return f"${get_daily_total(db_path, day):.4f}"

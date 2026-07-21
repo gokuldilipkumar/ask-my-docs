@@ -22,7 +22,7 @@ def test_query_command_prints_answer_citations_and_cost(monkeypatch, tmp_path):
         return FakeVerified()
 
     monkeypatch.setattr(app_main, "answer_with_verified_citations", fake_answer_with_verified_citations)
-    monkeypatch.setattr(app_main, "get_daily_total", lambda db_path: 0.0421)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda db_path: "$0.0421")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     result = runner.invoke(app, ["query", "--question", "What causes a stall?"])
@@ -45,7 +45,7 @@ def test_query_command_flags_low_confidence(monkeypatch):
     monkeypatch.setattr(
         app_main, "answer_with_verified_citations", lambda *a, **k: FakeVerified()
     )
-    monkeypatch.setattr(app_main, "get_daily_total", lambda db_path: 0.0)
+    monkeypatch.setattr(app_main, "format_daily_cost", lambda db_path: "$0.0000")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     result = runner.invoke(app, ["query", "--question", "q"])

@@ -14,7 +14,7 @@ from ingest.bm25_index import build_bm25_index
 from ingest.chunk_metadata import write_chunk_metadata
 from ingest.chunker import chunk_pdf
 from ingest.vector_index import build_vector_index
-from observability.daily_cost import get_daily_total
+from observability.daily_cost import format_daily_cost
 
 app = typer.Typer()
 
@@ -60,8 +60,7 @@ def query(
     flag = " (low confidence)" if result.low_confidence else ""
     typer.echo(f"Coverage: {result.coverage:.2f}{flag}")
 
-    total_cost = get_daily_total(Path(settings.observability.cost_db_path))
-    typer.echo(f"Daily cost so far: ${total_cost:.4f}")
+    typer.echo(f"Daily cost so far: {format_daily_cost(Path(settings.observability.cost_db_path))}")
 
 
 @app.command(name="eval")
@@ -99,8 +98,7 @@ def eval_command(
             path = save_baseline_run(result, Path(settings.eval.baseline_dir))
             typer.echo(f"Saved baseline: {path}")
 
-    total_cost = get_daily_total(Path(settings.observability.cost_db_path))
-    typer.echo(f"Daily cost so far: ${total_cost:.4f}")
+    typer.echo(f"Daily cost so far: {format_daily_cost(Path(settings.observability.cost_db_path))}")
 
     raise typer.Exit(code=exit_code)
 

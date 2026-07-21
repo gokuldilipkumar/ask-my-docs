@@ -27,7 +27,7 @@ def test_submitting_a_question_shows_the_answer(monkeypatch):
     at = AppTest.from_file(APP_PATH)
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0):
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"):
         at.run()
         at.chat_input[0].set_value("What causes a stall?").run()
 
@@ -43,7 +43,7 @@ def test_answer_shows_resolved_sources_and_low_confidence_warning(monkeypatch):
     }
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerifiedWithCitations()), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"), \
          patch("ingest.chunk_metadata.load_chunk_metadata", return_value=meta):
         at.run()
         at.chat_input[0].set_value("What causes a stall?").run()
@@ -60,7 +60,7 @@ def test_missing_citation_metadata_falls_back_to_raw_chunk_id(monkeypatch):
     at = AppTest.from_file(APP_PATH)
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerifiedWithCitations()), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"), \
          patch("ingest.chunk_metadata.load_chunk_metadata", return_value={}):
         at.run()
         at.chat_input[0].set_value("What causes a stall?").run()
@@ -74,7 +74,7 @@ def test_sidebar_shows_daily_cost_and_no_warning_under_cap(monkeypatch):
     at = AppTest.from_file(APP_PATH)
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0421), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0421"), \
          patch("observability.daily_cost.check_budget", return_value=False):
         at.run()
 
@@ -87,7 +87,7 @@ def test_sidebar_shows_budget_cap_warning_when_exceeded(monkeypatch):
     at = AppTest.from_file(APP_PATH)
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
-         patch("observability.daily_cost.get_daily_total", return_value=6.0), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$6.0000"), \
          patch("observability.daily_cost.check_budget", return_value=True):
         at.run()
 
@@ -99,7 +99,7 @@ def test_pipeline_error_shows_st_error_and_session_stays_usable(monkeypatch):
     at = AppTest.from_file(APP_PATH)
 
     with patch("citations.pipeline.answer_with_verified_citations", side_effect=RuntimeError("boom")), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"), \
          patch("observability.daily_cost.check_budget", return_value=False):
         at.run()
         at.chat_input[0].set_value("What causes a stall?").run()
@@ -109,7 +109,7 @@ def test_pipeline_error_shows_st_error_and_session_stays_usable(monkeypatch):
     assert not any(turn["role"] == "assistant" for turn in at.session_state["history"])
 
     with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerified()), \
-         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"), \
          patch("observability.daily_cost.check_budget", return_value=False):
         at.chat_input[0].set_value("A follow-up question?").run()
 
