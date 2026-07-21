@@ -1,3 +1,5 @@
+import pytest
+
 from ingest.chunk_metadata import ChunkMetadata, format_citation, load_chunk_metadata, write_chunk_metadata
 
 
@@ -16,13 +18,16 @@ def test_write_then_load_round_trips_metadata(make_chunk, tmp_path):
     )
 
 
-def test_load_chunk_metadata_raises_on_unknown_id(make_chunk, tmp_path):
+def test_load_chunk_metadata_raises_key_error_on_unknown_id(make_chunk, tmp_path):
+    # Pins the fail-loud contract src/app/streamlit_app.py's _resolve_sources relies on
+    # (its `except KeyError:` fallback only fires because this raises, not returns None).
     out_path = tmp_path / "chunk_metadata.json"
     write_chunk_metadata([make_chunk("abc123", "text")], out_path)
 
     loaded = load_chunk_metadata(out_path)
 
-    assert "unknown_id" not in loaded
+    with pytest.raises(KeyError):
+        loaded["unknown_id"]
 
 
 def test_format_citation_without_page_label():

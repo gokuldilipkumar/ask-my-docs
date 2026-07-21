@@ -3,6 +3,7 @@ from pathlib import Path
 import anthropic
 import typer
 
+from app.paths import DEFAULT_INDEX_DIR
 from citations.pipeline import answer_with_verified_citations
 from config import get_settings
 from eval.baseline import compare_to_baseline, load_latest_baseline
@@ -46,7 +47,7 @@ def ingest(pdf: Path = typer.Option(...), out: Path = typer.Option(...)) -> None
 @app.command()
 def query(
     question: str = typer.Option(...),
-    index: Path = typer.Option(Path("data/index")),
+    index: Path = typer.Option(DEFAULT_INDEX_DIR),
 ) -> None:
     settings = get_settings()
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -65,7 +66,7 @@ def query(
 
 @app.command(name="eval")
 def eval_command(
-    index: Path = typer.Option(Path("data/index")),
+    index: Path = typer.Option(DEFAULT_INDEX_DIR),
     retrieval_only: bool = typer.Option(False, "--retrieval-only"),
     save_baseline: bool = typer.Option(False, "--save-baseline"),
 ) -> None:

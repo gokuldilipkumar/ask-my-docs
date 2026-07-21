@@ -3,12 +3,11 @@ from pathlib import Path
 import anthropic
 import streamlit as st
 
+from app.paths import DEFAULT_INDEX_DIR as INDEX_DIR
 from citations.pipeline import answer_with_verified_citations
 from config import get_settings
 from ingest.chunk_metadata import format_citation, load_chunk_metadata
 from observability.daily_cost import check_budget, get_daily_total
-
-INDEX_DIR = Path("data/index")
 
 st.set_page_config(page_title="Ask My Docs -- FAA Airplane Flying Handbook")
 st.title("Ask My Docs")
