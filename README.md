@@ -125,10 +125,10 @@ actual regression.
 
 ```
 $ uv run pytest -m "not slow"
-128 passed, 17 deselected
+141 passed, 17 deselected
 
 $ uv run pytest
-139 passed, 6 skipped
+152 passed, 6 skipped
 ```
 
 (Skipped tests hit real paid APIs — Anthropic and Langfuse — gated behind
