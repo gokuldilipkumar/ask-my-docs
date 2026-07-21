@@ -38,12 +38,12 @@
 
 **Success criteria**
 
-- [ ] A real `eval --retrieval-only` comparison shows the chosen final `retrieval.top_n`/`rerank.max_length` values keep `mean_recall_at_k`/`mean_mrr`/`mean_ndcg` within `eval.tolerance` of the current committed baseline (`mean_recall_at_k=0.616, mean_mrr=0.906, mean_ndcg=0.783`).
-- [ ] A real timed query (same method as this plan's own probe) shows a measured latency reduction vs. the real 36.56s baseline captured this session, with the exact new number reported honestly (not assumed from the old "halves it" approximation).
+- [x] A real `eval --retrieval-only` comparison shows the chosen final `retrieval.top_n`/`rerank.max_length` values keep `mean_recall_at_k`/`mean_mrr`/`mean_ndcg` within `eval.tolerance` of the current committed baseline (`mean_recall_at_k=0.616, mean_mrr=0.906, mean_ndcg=0.783`). Real result: `top_n=10, max_length=256` → `recall=0.627 (improved), mrr=0.875, ndcg=0.778` — all PASS.
+- [x] A real timed query shows the real, honest result — **not** the hypothesis. `top_n`/`max_length` tuning alone barely moved latency (36.56s → 35.73s), because a follow-up zero-cost probe found the real driver is one-time model-loading (~13s), not compute scaling. Re-scoped to Chunk 11.3b (model prewarming), which fixes the *first-question* cold-start cost directly; the remaining ~10-20s/question (generation + verification, two real Anthropic API round-trips) is an accepted architectural floor, not something either track can reduce further without a real feature/quality tradeoff.
 - [ ] A real full `eval` run (judge-scored) shows `correctness_rate`/`completeness_rate` not regressed beyond `eval.tolerance` vs. the current baseline (`correctness_rate=0.875, completeness_rate=0.625`) for **both** tracks' combined changes.
 - [ ] A live-API test confirms `answer_text` from `answer_v2` contains no `[hexid]`-shaped bracket patterns for a real in-scope question, while `GeneratedAnswer.citations` is still populated with real chunk ids.
-- [ ] `uv run pytest -m "not slow"` and the full suite stay green throughout, including the five updated `_get_model` fakes in `tests/rerank/test_cross_encoder.py`.
-- [ ] `config.yaml`/`config.example.yaml` stay in sync (`rerank.max_length` present in both); `BUGS.md`/`.agent/decisions.log`/README updated with the real before/after numbers and the new `generation.timeout_seconds` finding.
+- [ ] `uv run pytest -m "not slow"` and the full suite stay green throughout, including the six updated `_get_model` fakes in `tests/rerank/test_cross_encoder.py` (the plan's own audit missed a 6th call site, found and fixed during `/build`).
+- [ ] `config.yaml`/`config.example.yaml` stay in sync (`rerank.max_length` present in both); `BUGS.md`/`.agent/decisions.log`/README updated with the real before/after numbers, the new `generation.timeout_seconds` finding, and the accepted ~10-20s/question floor.
 
 ---
 
@@ -155,13 +155,103 @@ Update `rerank()`'s call site: `model = _get_model(config.model, config.max_leng
 
 **Step 1 — cheap iteration via `--retrieval-only`** (zero API cost, per Block 9's established pattern): starting hypothesis `retrieval.top_n: 20 → 10`, `rerank.max_length: <unset> → 256`. Run `PYTHONPATH=src uv run python -m app.main eval --index data/index --retrieval-only` after each change; compare `mean_recall_at_k`/`mean_mrr`/`mean_ndcg` against the real committed baseline (`0.616/0.906/0.783`) and `eval.tolerance` (0.1). If either value pushes a metric outside tolerance, back off (e.g. `top_n=15`, or drop `max_length` entirely) — real evidence decides the final numbers, not the starting hypothesis.
 
-**Step 2 — real timed query** at the candidate config: re-run Chunk 11.0's timing probe, confirm an actual measured latency drop (report the real number, whatever it is).
+**Step 2 — real timed query** at the candidate config (`top_n=10`, `max_length=256`): confirmed real result — `retrieve=5.45s, rerank=11.76s, generate=13.26s, verify=5.24s, TOTAL=35.73s`, barely moved from the 36.56s baseline. **Real finding that changed this plan's understanding**: a follow-up zero-API-cost probe isolating retrieve+rerank across repeated calls in the same process showed `_model`/`_models` (module-level caches in `ingest/vector_index.py`/`rerank/cross_encoder.py`) make the *first* call in a process pay a ~13s model-loading cost (`retrieve=5.56s, rerank=7.65s` cold) while every call after it in the same process is near-instant (`retrieve=0.08s, rerank=0.43s` warm). **`top_n`/`max_length` tuning barely affects either number** — it can't reduce fixed model-loading time (cold), and warm calls were already sub-second regardless. The real, largely irreducible cost is generation (~13-15s) + citation verification (~2.5-5s) — two sequential real Anthropic API round-trips, unaffected by any of this block's retrieval-side tuning. Kept the `top_n=10`/`max_length=256` values anyway (Step 1 showed zero quality cost, small real bonus on cold-start compute), but re-scoped the actual latency fix to Chunk 11.3b (model prewarming) below, added mid-build once this real evidence came in — not something the original plan anticipated.
 
 **Step 3 — one real full `eval` run** (judge-scored, real cost) at the final candidate config to confirm `correctness_rate`/`completeness_rate` aren't regressed beyond `eval.tolerance` vs. the current baseline (`0.875/0.625`) — generation-level metrics could move if reranking now surfaces different/fewer chunks, which `--retrieval-only` mode can't detect on its own.
 
 **Step 4 — commit the final chosen values** to both `config.yaml` and `config.example.yaml` (kept in sync, per the Block 4 audit's config-template-drift lesson).
 
 **Step 5 — commit**: `git add config.yaml config.example.yaml && git commit -m "[Perf] Retrieval/Rerank: tune top_n/max_length for latency, verified against real eval baseline"` — commit message states the actual real before/after numbers found in Steps 1-3, not the hypothesis.
+
+---
+
+### Chunk 11.3b — pre-warm embedding/rerank models at Streamlit startup
+
+*(Added mid-build, not in the original plan — Chunk 11.3's real probe found the actual latency driver: a fresh process's first question pays a one-time ~13s model-loading cost that `top_n`/`max_length` tuning cannot touch. This chunk fixes that directly: load the models once when the chat session starts, not lazily on the first question, so the wait happens during natural page-read/typing time instead of mid-answer.)*
+
+**Files**: Modify `src/ingest/vector_index.py`, `src/rerank/cross_encoder.py`, `src/app/streamlit_app.py`, `tests/ingest/test_vector_index.py`, `tests/rerank/test_cross_encoder.py`, `tests/app/test_streamlit_app.py`.
+
+**Step 1 — write failing tests** (fast, no real model load — same monkeypatch style as existing tests in each file):
+```python
+# tests/ingest/test_vector_index.py
+def test_warm_model_loads_the_embedding_model_once(monkeypatch):
+    from ingest import vector_index
+
+    monkeypatch.setattr(vector_index, "_model", None)
+    calls = []
+
+    class FakeSentenceTransformer:
+        def __init__(self, name, device):
+            calls.append((name, device))
+
+    monkeypatch.setattr(vector_index, "SentenceTransformer", FakeSentenceTransformer)
+
+    vector_index.warm_model()
+    vector_index.warm_model()  # idempotent -- second call must not construct again
+
+    assert len(calls) == 1
+```
+```python
+# tests/rerank/test_cross_encoder.py
+def test_warm_model_loads_via_get_model(monkeypatch):
+    captured = []
+
+    def fake_get_model(name, max_length):
+        captured.append((name, max_length))
+        return object()
+
+    monkeypatch.setattr(cross_encoder, "_get_model", fake_get_model)
+    config = RerankConfig(enabled=True, model="some/model", max_length=256, top_k=1)
+
+    cross_encoder.warm_model(config)
+
+    assert captured == [("some/model", 256)]
+```
+```python
+# tests/app/test_streamlit_app.py
+def test_warms_models_once_per_session_with_a_spinner(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    at = AppTest.from_file(APP_PATH)
+    calls = {"embedding": 0, "rerank": 0}
+
+    with patch("ingest.vector_index.warm_model", side_effect=lambda: calls.__setitem__("embedding", calls["embedding"] + 1)), \
+         patch("rerank.cross_encoder.warm_model", side_effect=lambda config: calls.__setitem__("rerank", calls["rerank"] + 1)), \
+         patch("observability.daily_cost.format_daily_cost", return_value="$0.0000"), \
+         patch("observability.daily_cost.check_budget", return_value=False):
+        at.run()
+        at.run()  # second rerun (e.g. a later interaction) must not re-warm
+
+    assert calls == {"embedding": 1, "rerank": 1}
+```
+
+**Step 2 — verify failure**: `AttributeError: module 'ingest.vector_index' has no attribute 'warm_model'` / same for `rerank.cross_encoder` / same for the Streamlit patches — all three fail for the right reason (the functions don't exist yet).
+
+**Step 3 — implement minimal code**:
+```python
+# src/ingest/vector_index.py, after _get_model
+def warm_model() -> None:
+    _get_model()
+```
+```python
+# src/rerank/cross_encoder.py, after _get_model
+def warm_model(config: RerankConfig) -> None:
+    _get_model(config.model, config.max_length)
+```
+```python
+# src/app/streamlit_app.py, after client construction, before the sidebar cost display
+from ingest.vector_index import warm_model as warm_embedding_model
+from rerank.cross_encoder import warm_model as warm_rerank_model
+...
+if "models_warmed" not in st.session_state:
+    with st.spinner("Warming up retrieval models..."):
+        warm_embedding_model()
+        warm_rerank_model(settings.rerank)
+    st.session_state.models_warmed = True
+```
+
+**Step 4 — verify pass**: `uv run pytest tests/ingest/test_vector_index.py tests/rerank/test_cross_encoder.py tests/app/test_streamlit_app.py -v` → all green, no real model loaded by the new fast tests.
+
+**Step 5 — commit**: `git add src/ingest/vector_index.py src/rerank/cross_encoder.py src/app/streamlit_app.py tests/ingest/test_vector_index.py tests/rerank/test_cross_encoder.py tests/app/test_streamlit_app.py && git commit -m "[Feature] Chat UI: pre-warm embedding/rerank models at session start, not on first question"`
 
 ---
 
