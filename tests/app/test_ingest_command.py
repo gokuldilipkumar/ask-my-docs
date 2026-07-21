@@ -32,6 +32,7 @@ def test_ingest_command_creates_both_indexes(make_pdf, tmp_path, isolated_config
     assert result.exit_code == 0
     assert (out_dir / "bm25").exists()
     assert (out_dir / "lancedb").exists()
+    assert (out_dir / "chunk_metadata.json").exists()
 
 
 @pytest.mark.slow

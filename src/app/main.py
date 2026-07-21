@@ -10,6 +10,7 @@ from eval.baseline import save_baseline as save_baseline_run  # avoid shadowing 
 from eval.pipeline import run_eval
 from eval.schema import load_golden_questions
 from ingest.bm25_index import build_bm25_index
+from ingest.chunk_metadata import write_chunk_metadata
 from ingest.chunker import chunk_pdf
 from ingest.vector_index import build_vector_index
 from observability.daily_cost import get_daily_total
@@ -38,6 +39,7 @@ def ingest(pdf: Path = typer.Option(...), out: Path = typer.Option(...)) -> None
     )
     build_bm25_index(chunks, out / "bm25")
     build_vector_index(chunks, out / "lancedb")
+    write_chunk_metadata(chunks, out / "chunk_metadata.json")
     typer.echo(f"Ingested {len(chunks)} chunks from {pdf} into {out}")
 
 
