@@ -55,6 +55,20 @@ def test_answer_shows_resolved_sources_and_low_confidence_warning(monkeypatch):
     assert len(at.warning) == 1
 
 
+def test_missing_citation_metadata_falls_back_to_raw_chunk_id(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    at = AppTest.from_file(APP_PATH)
+
+    with patch("citations.pipeline.answer_with_verified_citations", return_value=FakeVerifiedWithCitations()), \
+         patch("observability.daily_cost.get_daily_total", return_value=0.0), \
+         patch("ingest.chunk_metadata.load_chunk_metadata", return_value={}):
+        at.run()
+        at.chat_input[0].set_value("What causes a stall?").run()
+
+    all_markdown = " ".join(m.value for m in at.markdown)
+    assert "abc123 (citation detail unavailable)" in all_markdown
+
+
 def test_sidebar_shows_daily_cost_and_no_warning_under_cap(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     at = AppTest.from_file(APP_PATH)
