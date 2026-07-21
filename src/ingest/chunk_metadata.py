@@ -30,3 +30,8 @@ def write_chunk_metadata(chunks: list[Chunk], out_path: Path) -> None:
 def load_chunk_metadata(path: Path) -> dict[str, ChunkMetadata]:
     raw = json.loads(path.read_text())
     return {chunk_id: ChunkMetadata(**fields) for chunk_id, fields in raw.items()}
+
+
+def format_citation(meta: ChunkMetadata) -> str:
+    page = f", p. {meta.printed_page_label}" if meta.printed_page_label else ""
+    return f"Ch. {meta.chapter_number}: {meta.chapter_title} — {meta.section_title}{page}"

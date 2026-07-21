@@ -1,4 +1,4 @@
-from ingest.chunk_metadata import ChunkMetadata, load_chunk_metadata, write_chunk_metadata
+from ingest.chunk_metadata import ChunkMetadata, format_citation, load_chunk_metadata, write_chunk_metadata
 
 
 def test_write_then_load_round_trips_metadata(make_chunk, tmp_path):
@@ -23,3 +23,17 @@ def test_load_chunk_metadata_raises_on_unknown_id(make_chunk, tmp_path):
     loaded = load_chunk_metadata(out_path)
 
     assert "unknown_id" not in loaded
+
+
+def test_format_citation_without_page_label():
+    meta = ChunkMetadata(chapter_number=4, chapter_title="Energy Management", section_title="Total Energy")
+
+    assert format_citation(meta) == "Ch. 4: Energy Management — Total Energy"
+
+
+def test_format_citation_with_page_label():
+    meta = ChunkMetadata(
+        chapter_number=4, chapter_title="Energy Management", section_title="Total Energy", printed_page_label="4-1"
+    )
+
+    assert format_citation(meta) == "Ch. 4: Energy Management — Total Energy, p. 4-1"
