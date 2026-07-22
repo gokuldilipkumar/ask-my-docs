@@ -17,6 +17,10 @@ def _get_model() -> SentenceTransformer:
     return _model
 
 
+def warm_model() -> None:
+    _get_model()
+
+
 def build_vector_index(chunks: list[Chunk], db_path: Path) -> None:
     model = _get_model()
     embeddings = model.encode([c.text for c in chunks], normalize_embeddings=True)

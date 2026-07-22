@@ -14,6 +14,10 @@ def _get_model(model_name: str, max_length: int | None) -> CrossEncoder:
     return _models[key]
 
 
+def warm_model(config: RerankConfig) -> None:
+    _get_model(config.model, config.max_length)
+
+
 def rerank(
     query: str, candidates: list[tuple[str, str]], config: RerankConfig,
     observability: ObservabilityContext | None = None,

@@ -1,6 +1,23 @@
 import pytest
 
+from ingest import vector_index
 from ingest.vector_index import build_vector_index, get_chunk_texts, search_vector
+
+
+def test_warm_model_loads_the_embedding_model_once(monkeypatch):
+    monkeypatch.setattr(vector_index, "_model", None)
+    calls = []
+
+    class FakeSentenceTransformer:
+        def __init__(self, name, device):
+            calls.append((name, device))
+
+    monkeypatch.setattr(vector_index, "SentenceTransformer", FakeSentenceTransformer)
+
+    vector_index.warm_model()
+    vector_index.warm_model()  # idempotent -- second call must not construct again
+
+    assert len(calls) == 1
 
 
 @pytest.mark.slow

@@ -112,6 +112,21 @@ def test_rerank_passes_max_length_to_get_model(monkeypatch):
     assert captured["max_length"] == 256
 
 
+def test_warm_model_loads_via_get_model(monkeypatch):
+    captured = []
+
+    def fake_get_model(name, max_length):
+        captured.append((name, max_length))
+        return object()
+
+    monkeypatch.setattr(cross_encoder, "_get_model", fake_get_model)
+    config = RerankConfig(enabled=True, model="some/model", max_length=256, top_k=1)
+
+    cross_encoder.warm_model(config)
+
+    assert captured == [("some/model", 256)]
+
+
 def test_rerank_truncates_to_top_k_and_handles_top_k_beyond_len(monkeypatch):
     # truncation is pure slicing — no need for the real model (audit finding);
     # ascending fake scores make the expected order deterministic: c > b > a

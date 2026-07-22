@@ -7,7 +7,9 @@ from app.paths import DEFAULT_INDEX_DIR as INDEX_DIR
 from citations.pipeline import answer_with_verified_citations
 from config import get_settings
 from ingest.chunk_metadata import format_citation, load_chunk_metadata
+from ingest.vector_index import warm_model as warm_embedding_model
 from observability.daily_cost import check_budget, format_daily_cost
+from rerank.cross_encoder import warm_model as warm_rerank_model
 
 st.set_page_config(page_title="Ask My Docs -- FAA Airplane Flying Handbook")
 st.title("Ask My Docs")
@@ -21,6 +23,12 @@ if "history" not in st.session_state:
 
 settings = get_settings()
 client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+if "models_warmed" not in st.session_state:
+    with st.spinner("Warming up retrieval models..."):
+        warm_embedding_model()
+        warm_rerank_model(settings.rerank)
+    st.session_state.models_warmed = True
 
 cost_db_path = Path(settings.observability.cost_db_path)
 st.sidebar.metric("Today's cost", format_daily_cost(cost_db_path))
