@@ -1,3 +1,4 @@
+import re
 from types import SimpleNamespace
 
 import anthropic
@@ -268,3 +269,18 @@ def test_generate_answer_admits_insufficient_context_for_off_topic_chunks():
     )
 
     assert result.citations == []
+
+
+@pytest.mark.slow
+@pytest.mark.live_api
+def test_generate_answer_v2_produces_no_inline_bracket_citations():
+    # Probe-verified 2026-07-22 against claude-sonnet-5: answer_v2's first draft held on
+    # the first real attempt -- no bracketed chunk id in answer_text, citations == ["stall001"].
+    client = anthropic.Anthropic(api_key=Settings().anthropic_api_key)
+    config = GenerationConfig()
+    chunks = [("stall001", "Stalls occur when the critical angle of attack is exceeded.")]
+
+    result = generate_answer(client, "What causes a stall?", chunks, config)
+
+    assert not re.search(r"\[[0-9a-f]{8,}\]", result.answer_text)
+    assert "stall001" in result.citations
