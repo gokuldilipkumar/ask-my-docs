@@ -14,9 +14,22 @@ def test_build_prompt_embeds_question_and_chunk_ids():
 def test_build_prompt_instructs_context_only_and_citation_by_id():
     prompt = build_prompt("any question", [("id1", "some text")])
 
-    assert "cite" in prompt.lower()
+    assert "citations" in prompt.lower()
     assert "only" in prompt.lower()  # "answer only from the provided context"
 
 
-def test_prompt_version_is_exposed():
-    assert PROMPT_VERSION == "answer_v1"
+def test_prompt_version_is_answer_v2():
+    assert PROMPT_VERSION == "answer_v2"
+
+
+def test_build_prompt_does_not_instruct_inline_bracket_citation():
+    prompt = build_prompt("any question", [("id1", "some text")])
+
+    assert "square brackets" not in prompt.lower()
+
+
+def test_build_prompt_still_instructs_the_citations_field_contract():
+    prompt = build_prompt("any question", [("id1", "some text")])
+
+    assert "citations" in prompt.lower()
+    assert "only" in prompt.lower()  # "supports a claim... only if"

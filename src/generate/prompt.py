@@ -1,6 +1,6 @@
 from pathlib import Path
 
-PROMPT_VERSION = "answer_v1"
+PROMPT_VERSION = "answer_v2"
 _TEMPLATE_PATH = Path(__file__).parent.parent.parent / "prompts" / f"{PROMPT_VERSION}.md"
 
 NO_CONTEXT_ANSWER = "I don't have information about that in this handbook."
